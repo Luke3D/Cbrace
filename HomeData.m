@@ -23,6 +23,7 @@ plotON = 1;                             %draw plots
 drawplot.activities = 0;
 drawplot.actvstime = 1;
 drawplot.confmat = 1;
+UseHMM = 0;                             
 
 %% ASK TO USE LAB/HOME/BOTH LABELED DATA FOR TRAINING
 use_home = 0; use_lab = 0;
@@ -815,7 +816,7 @@ end
 cd([ARCode 'code/'])
 
 %The HMM Transition Matrix (A)
-transitionFile = 'A_3Activity.xlsx';
+transitionFile = 'A_5ActivityNSS.xlsx';
 A = xlsread(transitionFile);
 
 %Clip threshold options
@@ -936,6 +937,21 @@ disp('Predicting with RF')
 t = toc;
 disp(['RF Prediction took ' num2str(t) ' seconds.'])
 codesRF = str2num(cell2mat(codesRF));
+
+if UseHMM
+    disp('Predicting with HMM')
+    tic
+    [gamma, ~, ~, ~, ~]   = hmmInferNodes(HMMmodel,P_RF');
+    [statesHmm, codesHmm] = getPredictedStates(gamma',uniqStates);
+    
+    timeHMM = toc;
+    disp(['HMM Prediction took ' num2str(timeHMM) ' seconds.'])
+    
+    %do not rename the variables
+    P_RF1 = P_RF;
+    P_RF = gamma';      %the posteriors
+    codesRF = codesHmm; %the predictions    
+end
 
 %% FIGURES SUMMARIZING RESULTS
 home_folder = [ARCode 'home_data/CBR' subj_str '/'];
