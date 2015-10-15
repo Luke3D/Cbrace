@@ -23,7 +23,7 @@ plotON = 1;                             %draw plots
 drawplot.activities = 0;
 drawplot.actvstime = 1;
 drawplot.confmat = 1;
-UseHMM = 0;                             
+UseHMM = 1;                             
 
 %% ASK TO USE LAB/HOME/BOTH LABELED DATA FOR TRAINING
 use_home = 0; use_lab = 0;

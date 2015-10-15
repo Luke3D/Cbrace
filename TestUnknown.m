@@ -1,16 +1,12 @@
-%% NEW RF-HMM CODE for Train/Test - 1 Location Only (Belt)
-%Rev by Luca Lonini 11.18.2013
-%ver2: Save RF and HMM models and accuracies
-%ver3: Shows how many clips of each activity type we are removing
-%Init HMM Emission Prob with PTrain from the RF
-%and Run the RF+HMM on ALL data
-%ver TIME: grab data for folds sequentially over time
+%Test approach to determine unknown class
+%Use hard threshold on RF posterior
+%Train on 4 classes, use the 5th as the unknown
 
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 slashdir = '/';
 
-currentDir = pwd; 
+currentDir = pwd;
 addpath([pwd slashdir 'sub']); %create path to helper scripts
 addpath(genpath([slashdir 'Traindata'])); %add path for train data
 
@@ -20,6 +16,8 @@ drawplot.activities = 1;                % show % of each activity
 drawplot.accuracy = 0;
 drawplot.actvstime = 1;
 drawplot.confmat = 1;
+drawplot.posterior = 1;
+drawplot.posteriorhist = 1;
 
 %Additional options
 clipThresh = 0; %to be in training set, clips must have >X% of label
@@ -29,6 +27,12 @@ OOBVarImp = 'off';   %enable variable importance measurement
 %The HMM Transition Matrix (A)
 transitionFile = 'A_5ActivityNSS.xlsx';
 A = xlsread(transitionFile);
+
+%The unknown class
+uc = 2; %1=sit, 2=dw, 3=up, 4=stand, 5=walk
+A(uc,:) = []; A(:,uc) = []; %remove the unknown activity from A
+
+PosteriorallTP = [];              %store the posterior of the classifier sorted by activity
 
 %% LOAD DATA TO ANALYZE
 proceed = 1;
@@ -55,9 +59,9 @@ fprintf('\n')
 all_subjectID = trainingClassifierData.subjectID;
 
 proceed = 1;
-while proceed > 0 
+while proceed > 0
     subject_analyze = input('Subject ID to analyze (ex. 5): ');
-
+    
     %Check if subjectID is in mat file
     if ~any(subject_analyze == all_subjectID)
         disp('-------------------------------------------------------------')
@@ -76,12 +80,12 @@ if strcmpi(population,'patient')
         temp = char(cData_temp2.subject(zz));
         cData_temp2.subjectBrace(zz) = {temp(7:9)};
     end
-
+    
     proceed = 1;
     while proceed > 0
         fprintf('\n')
         brace_analyze = input('Brace to analyze (SCO, CBR, both): ','s');
-
+        
         %Check if brace entered is SCO or CBR or both
         if ~(strcmpi(brace_analyze,'SCO') || strcmpi(brace_analyze,'CBR') || strcmpi(brace_analyze,'BOTH'))
             disp('---------------------------------------------------------------')
@@ -91,7 +95,7 @@ if strcmpi(population,'patient')
             %Check if SCO or CBR are in mat file
             if (strcmpi(brace_analyze,'both'))
                 brace_analyze = 'both';
-
+                
                 if isempty(strmatch('Cbr',cData_temp2.subjectBrace)) || isempty(strmatch('SCO',cData_temp2.subjectBrace))
                     disp('--------------------------------------------------------')
                     disp('Brace not in trainingClassifierData.mat file. Try again.')
@@ -101,7 +105,7 @@ if strcmpi(population,'patient')
                 end
             elseif (strcmpi(brace_analyze,'CBR'))
                 brace_analyze = 'Cbr';
-
+                
                 if isempty(strmatch('Cbr',cData_temp2.subjectBrace))
                     disp('------------------------------------------------------')
                     disp('CBR not in trainingClassifierData.mat file. Try again.')
@@ -111,7 +115,7 @@ if strcmpi(population,'patient')
                 end
             elseif (strcmpi(brace_analyze,'SCO'))
                 brace_analyze = 'SCO';
-
+                
                 if isempty(strmatch('SCO',cData_temp2.subjectBrace))
                     disp('------------------------------------------------------')
                     disp('SCO not in trainingClassifierData.mat file. Try again.')
@@ -122,7 +126,7 @@ if strcmpi(population,'patient')
             end
         end
     end
-
+    
     cData_temp = isolateBrace(cData_temp2,brace_analyze);
 else
     cData_temp = cData_temp2;
@@ -131,7 +135,7 @@ end
 proceed = 1;
 while proceed > 0
     fprintf('\n')
-    disp('Please enter the max number of sessions to analyze.'); 
+    disp('Please enter the max number of sessions to analyze.');
     disp('Or type 0 to analyze all sessions available.')
     min_sessions = input('Min session ID: ');
     max_sessions = input('Max session ID: ');
@@ -150,6 +154,33 @@ fprintf('\n')
 
 %Remove data from other locations if required (old datasets)
 cData = removeDataWithoutLocation(cData,'Belt');
+
+%rename the unknown state as X
+iukw = strcmp(cData.activity,'Stairs Dw');
+cData.activity(iukw) = repmat({'X'},[sum(iukw) 1]);
+
+%create structure for test data and include the unknown class data
+cDataTest = cData;
+cDataTest.activity(~iukw) = [];
+cDataTest.features(~iukw,:) = [];
+cDataTest.activityFrac(~iukw) = [];
+
+%remove unknown class from train data
+cData.activity(iukw) = [];
+cData.features(iukw,:) = [];
+cData.activityFrac(iukw) = [];
+
+%Split remaining train data into CV Data (4 classes) and Test Data (4 classes + Unknown
+%class) - Use 70-30% split
+indsplit = round(0.8*length(cData.activity));
+%TEST DATA
+cDataTest.activity = [cDataTest.activity ; cData.activity(indsplit:end)];
+cDataTest.features = [cDataTest.features ; cData.features(indsplit:end,:)];
+cDataTest.activityFrac = [cDataTest.activityFrac ; cData.activityFrac(indsplit:end)];
+%CV DATA (Used for cross-validation)
+cData.activity(indsplit:end) = [];
+cData.features(indsplit:end,:) = [];
+cData.activityFrac(indsplit:end) = [];
 
 %Create local variables for often used data
 features     = cData.features; %features for classifier
@@ -170,6 +201,7 @@ for i = 1:length(uniqStates)
     disp([num2str(removed) ' % of ' uniqStates{i} ' Train data removed (<' num2str(clipThresh) '% of clip)'])
 end
 
+
 %% SORT THE DATA FOR K-FOLDS + RF TRAIN/TEST
 
 %Indices for test set + set all to 0, we will specify test set soon
@@ -186,7 +218,7 @@ StateCodes = cell(length(uniqStates),2);
 StateCodes(:,1) = uniqStates;
 StateCodes(:,2) = num2cell(1:length(uniqStates)); %sorted by unique
 
-activity_acc_matrix = zeros(5,folds);
+activity_acc_matrix = zeros(4,folds);
 
 %Do k fold cross validation for RF
 for k = 1:folds
@@ -201,15 +233,12 @@ for k = 1:folds
     TrainingSet = ~testSet;
     TrainingSet(removeInd) = 0;   %remove clips
     
+    
     %% RF TRAINING AND TESTING
     
     %TRAIN RF
-    ntrees = 300;
+    ntrees = 100;
     
-    %cost matrix 
-    CostM = 0.5*ones(5,5); CostM([1 7 13 19 25]) = 0; 
-    CostM(2,:) = 5; CostM(2,2) = 0;    %increase cost of misclassifying stairs
-    CostM(3,:) = 5; CostM(3,3) = 0;
     
     tic; %start timer
     
@@ -218,15 +247,15 @@ for k = 1:folds
     
     %How many samples of each activity we have in the test fold
     for i = 1:length(uniqStates)
-%        inda = find(strcmp(trainingClassifierData.activity(testSet),uniqStates(i))); 
+        %        inda = find(strcmp(trainingClassifierData.activity(testSet),uniqStates(i)));
         inda = find(strcmp(cData.activity(testSet),uniqStates(i)));
         Nsa = length(inda);
         indtot = find(strcmp(trainingClassifierData.activity,uniqStates(i)));
         Nsaperc = Nsa/length(indtot)*100;
         disp([num2str(Nsa) ' Samples of ' uniqStates{i} ' in this fold  (' num2str(Nsaperc) '% of total)'])
     end
-
-    RFmodel = TreeBagger(ntrees,features(TrainingSet,:),codesTrue(TrainingSet)','OOBVarImp',OOBVarImp,'Cost',CostM);
+    
+    RFmodel = TreeBagger(ntrees,features(TrainingSet,:),codesTrue(TrainingSet)','OOBVarImp',OOBVarImp);
     
     %Plot var importance
     if strcmp(OOBVarImp,'on')
@@ -237,7 +266,7 @@ for k = 1:folds
     end
     
     timeRF = toc; %end timer
-      
+    
     %RF Prediction and RF class probabilities for ENTIRE dataset. This is
     %for initializing the HMM Emission matrix (P_RF(TrainSet)) and for
     %computing the observations of the HMM (P_RF(TestSet))
@@ -308,10 +337,10 @@ for k = 1:folds
     results(k).statesTrue       = statesTrue(testSet);
     results(k).trainingSet      = TrainingSet;
     results(k).testSet          = testSet;
-%     results(k).codesTrue       = codesTrue(testSet);
-%     results(k).codesRF         = codesRF(testSet);
-%     results(k).codesHmm        = codesHmm;
-     
+    %     results(k).codesTrue       = codesTrue(testSet);
+    %     results(k).codesRF         = codesRF(testSet);
+    %     results(k).codesHmm        = codesHmm;
+    
     disp(['accRF = ' num2str(accRF)]);
     disp(['accHmm = ' num2str(accHmm)]);
     disp(['Train Time RF = ' num2str(timeRF) ' s'])
@@ -320,12 +349,12 @@ for k = 1:folds
     %% PLOT PREDICTED AND ACTUAL STATES
     
     %Rename states for plot efficiency
-    StateCodes(:,1) = {'Sit','Stairs Dw','Stairs Up','Stand','Walk'};
+    %     StateCodes(:,1) = {'Sit','Stairs Dw','Stairs Up','Stand','Walk'};
     
     if plotON
         if drawplot.actvstime
             dt = cData.clipdur * (1-cData.clipoverlap);
-            t = 0:dt:dt*(length(codesTrue(testSet))-1);  
+            t = 0:dt:dt*(length(codesTrue(testSet))-1);
             figure('name',['k-fold ' num2str(k)]); hold on
             subplot(211), hold on
             plot(t,codesTrue(testSet),'.-g')
@@ -350,7 +379,7 @@ for k = 1:folds
             end
             set(gca,'XTickLabel',{'RF','RF+HMM'})
         end
-            
+        
         if drawplot.confmat
             figure('name',['k-fold ' num2str(k)]); hold on
             correctones = sum(matRF,2);
@@ -367,6 +396,45 @@ for k = 1:folds
             activity_acc_matrix(:,k) = diag(matRF./correctones);
         end
     end
+    
+    if drawplot.posterior
+        PosterioraTP = [];
+        Posterior = P_RF(testSet,:);    %posterior for each class for data in fold k
+        codesRFTest = codesRF(testSet);  %predicted activities in fold k
+        codesTrueTest = codesTrue(testSet)';  %true activities in fold k
+        for a = 1:length(uniqStates)
+            idx = find(codesRFTest == a);  %predicted activity a
+            Posteriora = Posterior(idx,a);   %posterior for activity a (TP and FP)
+            TP_ind = find(codesRFTest(idx) == codesTrueTest(idx)); %find indices of true postive
+            PosterioraTP = [PosterioraTP; Posteriora(TP_ind) repmat(a,size(TP_ind))];    %posterior for TP only, 2nd col is activity
+            %             PosteriorallTP = [PosteriorallTP; Posteriora(TP_ind) repmat(a,size(TP_ind))]; %store posterior for all folds
+        end
+        figure('name',['k-fold ' num2str(k)]);
+        boxplot(PosterioraTP(1:end,1),PosterioraTP(:,end),'labels',StateCodes(:,1))
+        
+        %the posterior across all folds
+        PosteriorallTP = [PosteriorallTP; PosterioraTP]; %store posterior for all folds
+        if k == folds
+            figure('name','Posterior for all TP');
+            boxplot(PosteriorallTP(1:end,1),PosteriorallTP(:,end),'labels',StateCodes(:,1))
+        end
+        %the 25th percentile per activity
+        for a = 1:length(uniqStates)
+            thrprc(a) = prctile(PosteriorallTP(PosteriorallTP(:,2)==a),25);
+        end
+        
+        if drawplot.posteriorhist && k == folds
+            figure('name','Histogram of Posterior for TP')
+            for a = 1:length(uniqStates)
+                subplot(1,5,a)
+                histogram(PosteriorallTP(PosteriorallTP(:,2)==a))
+            end
+            
+        end
+        
+        
+    end
+    
 end
 
 %Display % of each activity over all predictions
@@ -377,13 +445,13 @@ if drawplot.activities
         for k = 1:folds
             ind = [ind; strcmp(results(k).statesHmm,Activity{a})];
         end
-        Activity{a,2} = sum(ind)./size(ind,1)*100;  % the % of each activity 
-    end 
+        Activity{a,2} = sum(ind)./size(ind,1)*100;  % the % of each activity
+    end
     figure('name','% of activities')
     pchart = pie(cell2mat(Activity(:,2)),StateCodes(:,1));
-%     bar(cell2mat(Activity(:,2)));
-%     set(gca,'XTickLabel',StateCodes(:,1))
-%     ylabel('% of time spent')
+    %     bar(cell2mat(Activity(:,2)));
+    %     set(gca,'XTickLabel',StateCodes(:,1))
+    %     ylabel('% of time spent')
 end
 
 %Average accuracy over all folds
@@ -405,7 +473,7 @@ disp(['Mean (k-fold) accHmm = ' num2str(accHmm)]);
 matRF = matRF./folds;
 matHmm = matHmm./folds;
 figure('name','Mean (k-fold) Confusion matrix')
-subplot(121); imagesc(matRF); 
+subplot(121); imagesc(matRF);
 colorbar
 [cmin,cmax] = caxis;
 caxis([0,1])
@@ -459,11 +527,51 @@ disp(acc_tbl)
 %% Activity Accuracy Table
 temp2 = mean(activity_acc_matrix');
 activity_acc = [activity_acc_matrix temp2'];
-act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
+% act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
 var_name = cell(folds+1,1);
 for ii = 1:folds
     var_name(ii) = {['Fold_' num2str(ii)]};
 end
 var_name(end) = {'Mean'};
 
-activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
+activity_tbl = array2table(activity_acc,'RowNames',StateCodes(:,1),'VariableNames',var_name);
+
+%% Now train a forest on all CV data and test on the unknown class (Test Set)
+
+Xtrain = cData.features;
+Ytrain = codesTrue';
+
+Xtest = cDataTest.features; %contains the unknown class
+Ytest = cDataTest.activity;
+Ytest = double(categorical(Ytest)); %convert to codes
+StateCodes{5,1}='X';  StateCodes{5,2}=5;  %the codes
+
+RFmodel = TreeBagger(ntrees,Xtrain,Ytrain);
+[codesRFTest,P_RFTest] = predict(RFmodel,Xtest);
+codesRFTest = str2double(codesRFTest)
+%filter the prediction with threshold
+P_RFTest = max(P_RFTest,[],2);
+P_RFTest = [P_RFTest codesRFTest];
+P_RFTest = [P_RFTest thrprc(codesRFTest)'];
+
+iX = find(P_RFTest(:,1) < P_RFTest(:,3));
+codesRFTest(iX) = 5;    %assign the unknown class to Posteriors below the threshold
+
+cmat = confusionmat(Ytest,codesRFTest)
+acc = trace(cmat)/sum(sum(cmat));   %accuracy
+correctones = sum(cmat,2);
+correctones = repmat(correctones,[1 length(unique(Ytest))]);
+figure
+imagesc(cmat./correctones); colorbar
+colorbar
+[cmin,cmax] = caxis;
+caxis([0,1])
+ax = gca;
+ax.XTick = 1:size(StateCodes,1);
+ax.YTick = 1:size(StateCodes,1);
+set(gca,'XTickLabel',{})
+set(gca,'YTickLabel',StateCodes(:,1))
+axis square
+title(['Accuracy = ', num2str(acc)])
+
+%need to plot known and unknown
