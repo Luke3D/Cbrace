@@ -3,3 +3,4 @@ Homedata/
 Testdata/
 Traindata/
 *.asv
+.DS_Store
