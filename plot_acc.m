@@ -1,5 +1,3 @@
-% HI LUCA
-
 %Import a csv file as t x y z variables
 figure
 hold on
