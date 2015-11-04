@@ -6,7 +6,7 @@ warning('off','all')
 slashdir = '/';
 
 cd(fileparts(which('HomeData.m')))
-currentDir = pwd; 
+currentDir = pwd;
 addpath([pwd slashdir 'sub']); %create path to helper scripts
 addpath(genpath([slashdir 'Traindata'])); %add path for train data
 
