@@ -1049,7 +1049,6 @@ set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick'
 legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar.png'])
 
-<<<<<<< Updated upstream
 %Box plot showing distribution of stairs across days
 figure('name','Distribution of stairclimbing time for the home trial','units','normalized','outerposition',[0 0 1 1])
 Up = activity_tally_HR(2,:).*60;
@@ -1060,7 +1059,7 @@ medstairs = median(sum(Stairs,2))
 title([{'Distribution of stairclimbing time CBR' subj_str ' - ' upper(brace_analyze) '\n Median Time = ' num2str(medstairs) 'min'])
 ylabel('Time [min]')
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
-=======
+
 %Activity Profile (BAR) - Normalized by Day to Percentages
 activity_tally_HR_norm = zeros(size(activity_tally_HR));
 summed = sum(activity_tally_HR,1); %totals for each day
@@ -1084,7 +1083,6 @@ ylim([0 100])
 set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick',[10:10:100],'TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
 legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar_Norm.png'])
->>>>>>> Stashed changes
 
 %% RESET CURRENT DIRECTORY
 
