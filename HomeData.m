@@ -1049,6 +1049,17 @@ set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick'
 legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar.png'])
 
+%Box plot showing distribution of stairs across days
+figure('name','Distribution of stairclimbing time for the home trial','units','normalized','outerposition',[0 0 1 1])
+Up = activity_tally_HR(2,:).*60;
+Dw = activity_tally_HR(3,:).*60;
+Stairs = [Up' Dw'];
+boxplot(Stairs,'labels',StateCodes(2:3,1))
+medstairs = median(sum(Stairs,2))
+title([{'Distribution of stairclimbing time CBR' subj_str ' - ' upper(brace_analyze) '\n Median Time = ' num2str(medstairs) 'min'])
+ylabel('Time [min]')
+export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
+
 %% RESET CURRENT DIRECTORY
 
 cd(code_folder) %set current path back to code folder
