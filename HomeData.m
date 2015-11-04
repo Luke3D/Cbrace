@@ -28,6 +28,7 @@ UseHMM = 1;
 %% ASK TO USE LAB/HOME/BOTH LABELED DATA FOR TRAINING
 use_home = 0; use_lab = 0;
 proceed = 1;
+fprintf(2,'FOR TRAINING DATA:\n');
 while proceed > 0
     train = input('Train on labeled data from lab or home or both? ','s');
     if strcmpi(train,'lab')
@@ -493,23 +494,25 @@ end
 
 %% HOME DATA DIRECTORIES
 filename = '';
-for directory = 1:length(dirList)
-    dirName = dirList(directory).name;
-    if dirName(1) == '.' %skip hidden files
-        continue
-    else
-        dirName = dirName(1:end-4); %remove .csv from string
-        if strcmpi(dirName(23:end),brace_analyze) %check end of file name
-            disp([brace_analyze ' home data located for CBR' subj_str '.'])
-            filename = dirName;
+if ExtractWearFeatures || ExtractAllFeatures
+    for directory = 1:length(dirList)
+        dirName = dirList(directory).name;
+        if dirName(1) == '.' %skip hidden files
+            continue
+        else
+            dirName = dirName(1:end-4); %remove .csv from string
+            if strcmpi(dirName(23:end),brace_analyze) %check end of file name
+                disp([brace_analyze ' home data located for CBR' subj_str '.'])
+                filename = dirName;
+            end
         end
     end
-end
 
-if isempty(filename)
-    error('Home data file for this brace could not be located.');
-else
-    datafile = [home_folder filename];
+    if isempty(filename)
+        error('Home data file for this brace could not be located.');
+    else
+        datafile = [home_folder filename];
+    end
 end
 
 %% Variable Initialization
@@ -1049,15 +1052,16 @@ set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick'
 legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar.png'])
 
-%Box plot showing distribution of stairs across days
-figure('name','Distribution of stairclimbing time for the home trial','units','normalized','outerposition',[0 0 1 1])
-Up = activity_tally_HR(2,:).*60;
-Dw = activity_tally_HR(3,:).*60;
+%Stairs Per Day (BOX)
+figure('name','Stairclimbing Time Distribution','units','normalized','outerposition',[0 0 1 1])
+Up = activity_tally_HR(2,:).*60; %convert to minutes
+Dw = activity_tally_HR(3,:).*60; %convert to minutes
 Stairs = [Up' Dw'];
 boxplot(Stairs,'labels',StateCodes(2:3,1))
 medstairs = median(sum(Stairs,2))
-title(['Distribution of stairclimbing time CBR' subj_str ' - ' upper(brace_analyze) '    Median = ' num2str(medstairs) 'min'])
-ylabel('Time [min]')
+title({['Distribution of Stairclimbing Time | CBR' subj_str ' - ' upper(brace_analyze)], ['Median = ' num2str(medstairs) ' min']},'FontSize',18)
+ylabel('Time [min]','FontSize',18)
+set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold');
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
 
 %Activity Profile (BAR) - Normalized by Day to Percentages
