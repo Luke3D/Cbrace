@@ -1056,7 +1056,7 @@ Dw = activity_tally_HR(3,:).*60;
 Stairs = [Up' Dw'];
 boxplot(Stairs,'labels',StateCodes(2:3,1))
 medstairs = median(sum(Stairs,2))
-title([{'Distribution of stairclimbing time CBR' subj_str ' - ' upper(brace_analyze) '\n Median Time = ' num2str(medstairs) 'min'])
+title(['Distribution of stairclimbing time CBR' subj_str ' - ' upper(brace_analyze) '    Median = ' num2str(medstairs) 'min'])
 ylabel('Time [min]')
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
 
