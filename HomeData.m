@@ -820,10 +820,6 @@ end
 %% PREPARE FOR TRAINING
 cd([ARCode 'code/'])
 
-%The HMM Transition Matrix (A)
-transitionFile = 'A_5ActivityNSS.xlsx';
-A = xlsread(transitionFile);
-
 %Clip threshold options
 clipThresh = 0; %to be in training set, clips must have >X% of label
 
@@ -909,8 +905,18 @@ sigma   = zeros(d,1,nstates);   %std dev of emission distribution
 Pi      = ones(length(uniqStates),1) ./ length(uniqStates); %uniform prior
 sigmaC  = .1;                   %use a constant std dev
 
+%The HMM Transition Matrix (A)
+if d == 3
+    transitionFile = 'A_3Activity.xlsx';
+elseif d == 5
+    transitionFile = 'A_5ActivityNSS.xlsx';
+else
+    error('Appropriate transition matrix file for HMM is not selected.')
+end
+A = xlsread(transitionFile);
+
 %Create emission probabilities for HMM
-PBins  = cell(d,1);
+PBins = cell(d,1);
 
 %For each type of state we need a distribution
 for bin = 1:d
@@ -1017,7 +1023,7 @@ for ii = 1:length(time_clips) %crop all timestamps
     k2 = cell2mat(k2); %convert string to number
     time_clips_cropped{ii} = time_clips{ii}(1:(k2-cut)); %crop to month/day
 end
-activity_tally = zeros(5,length(days));
+activity_tally = zeros(d,length(days));
 days_crop = cellfun(@(s) s(1:end-1), days, 'uni',false);
 time_match = 0;
 for ii = 1:length(codesRF) %tally the activities
