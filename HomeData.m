@@ -53,7 +53,8 @@ if use_lab
     fprintf('\n')
     filename = 'trainData_patient.mat';
     load(filename)
-    disp('LAB LABELED training data file loaded.')
+    fprintf(2,'FOR THE LAB TRAINING DATA:\n')
+    disp('Lab labeled training data file loaded.')
 
     tt = num2str(unique(trainingClassifierData.subjectID)');
     fprintf('\n')
@@ -234,7 +235,8 @@ if use_home
     fprintf('\n')
     filename = 'trainData_home.mat';
     load(filename)
-    disp('HOME LABELED training data file loaded.')
+    fprintf(2,'FOR THE HOME TRAINING DATA:\n')
+    disp('Home labeled training data file loaded.')
 
     tt = num2str(unique(trainingClassifierData.subjectID)');
     fprintf('\n')
@@ -412,7 +414,7 @@ end
 
 %% DETERMINE ALL VS. WEAR FOR HOME DATA
 fprintf('\n')
-disp('FOR HOME DATA: ')
+fprintf(2,'FOR TESTING HOME DATA:\n')
 
 %Ask for which subject to use
 subject_analyze = input('Enter subject ID to analyze: ');
