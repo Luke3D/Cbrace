@@ -885,6 +885,7 @@ disp(['Stairs Dw: ' num2str(length(strmatch('Stairs Dw',statesTrue,'exact'))) ' 
 disp(['Stairs Up: ' num2str(length(strmatch('Stairs Up',statesTrue,'exact'))) ' (' num2str((length(strmatch('Stairs Up',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
 disp(['Standing:  ' num2str(length(strmatch('Standing',statesTrue,'exact'))) ' (' num2str((length(strmatch('Standing',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
 disp(['Walking:   ' num2str(length(strmatch('Walking',statesTrue,'exact'))) ' (' num2str((length(strmatch('Walking',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
+fprintf('\n')
 
 RFmodel = TreeBagger(ntrees,features,codesTrue');
 
