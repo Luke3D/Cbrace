@@ -880,6 +880,11 @@ StateCodes(:,2) = num2cell(1:length(uniqStates)); %sorted by unique
 ntrees = 100;
 fprintf('\n')
 disp(['RF Train - Number of samples train = ' num2str(size(features,1))])
+disp(['Sitting: ' num2str(length(strmatch('Sitting',statesTrue,'exact'))) ' (' num2str((length(strmatch('Sitting',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
+disp(['Stairs Dw: ' num2str(length(strmatch('Stairs Dw',statesTrue,'exact'))) ' (' num2str((length(strmatch('Stairs Dw',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
+disp(['Stairs Up: ' num2str(length(strmatch('Stairs Up',statesTrue,'exact'))) ' (' num2str((length(strmatch('Stairs Up',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
+disp(['Standing: ' num2str(length(strmatch('Standing',statesTrue,'exact'))) ' (' num2str((length(strmatch('Standing',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
+disp(['Walking: ' num2str(length(strmatch('Walking',statesTrue,'exact'))) ' (' num2str((length(strmatch('Walking',statesTrue,'exact'))./length(statesTrue))*100) '%)']);
 
 RFmodel = TreeBagger(ntrees,features,codesTrue');
 
