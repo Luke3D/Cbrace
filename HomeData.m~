@@ -983,13 +983,13 @@ figure('name','Prob Distribution for Each Activity')
 hold on
 subplot(211)
 boxplot(maxPRF,codesRF,'labels',StateCodes(:,1))
-ylim([0 1.2])
+ylim([0 1])
 subplot(212)
 hold on
 bar(1:length(StateCodes),mposta)
 ax = gca; 
 set(ax,'XTick',1:5,'XTickLabel',StateCodes(:,1))
-ylim([0 1.2])
+ylim([0 1])
 errorbar(1:length(StateCodes),mposta,stdposta,'ko')
 print(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Prob'],'-dpng')
 
@@ -1049,42 +1049,9 @@ set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick'
 legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar.png'])
 
-<<<<<<< Updated upstream
-%Box plot showing distribution of stairs across days
-figure('name','Distribution of stairclimbing time for the home trial','units','normalized','outerposition',[0 0 1 1])
-Up = activity_tally_HR(2,:).*60;
-Dw = activity_tally_HR(3,:).*60;
-Stairs = [Up' Dw'];
-boxplot(Stairs,'labels',StateCodes(2:3,1))
-medstairs = median(sum(Stairs,2))
-title([{'Distribution of stairclimbing time CBR' subj_str ' - ' upper(brace_analyze) '\n Median Time = ' num2str(medstairs) 'min'])
-ylabel('Time [min]')
-export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
-=======
 %Activity Profile (BAR) - Normalized by Day to Percentages
-activity_tally_HR_norm = zeros(size(activity_tally_HR));
-summed = sum(activity_tally_HR,1); %totals for each day
-for zz = 1:length(summed)
-    if summed(zz) == 0
-        %don't normalize (will be undefined values)
-    else
-        activity_tally_HR_norm(:,zz) = (activity_tally_HR(:,zz)./summed(zz))*100;
-    end
-end
-figure('name','Activity Profile by Calendar (BAR_Norm)','units','normalized','outerposition',[0 0 1 1])
-bar(activity_tally_HR_norm','stacked')
-if data_removed == 0
-    title({['CBR' subj_str ' - ' upper(brace_analyze)],['Data Removed: ' data_removed_str '%']},'FontSize',18)
-else
-    title({['CBR' subj_str ' - ' upper(brace_analyze)],['Data Removed: ' data_removed_str(1:5) '%']},'FontSize',18)
-end
-ylabel('Percent of Day','FontSize',18)
-xlim([0 length(days_plot)+1])
-ylim([0 100])
-set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick',[10:10:100],'TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
-legend({StateCodes{:,1}},'FontSize',16)
-export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar_Norm.png'])
->>>>>>> Stashed changes
+
+
 
 %% RESET CURRENT DIRECTORY
 
