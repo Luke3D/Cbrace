@@ -447,7 +447,6 @@ while proceed > 0
     end
 end
 
-
 %Ask for whether to use all or only wear data
 proceed = 1;
 while proceed > 0
