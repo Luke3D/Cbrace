@@ -23,7 +23,8 @@ plotON = 1;                             %draw plots
 drawplot.activities = 0;
 drawplot.actvstime = 1;
 drawplot.confmat = 1;
-UseHMM = 1;                             
+UseHMM = 1;  
+subject_stairs = [2 8]; %List of subject IDs for stairs to remove
 
 %% ASK TO USE LAB/HOME/BOTH LABELED DATA FOR TRAINING
 use_home = 0; use_lab = 0;
@@ -850,7 +851,6 @@ if clipThresh > 0
         [cData_home, removeInd] = removeDataWithActivityFraction(cData_home,clipThresh);
     end
     
-    
     fprintf('\n')
     for i = 1:length(uniqStates)
         indr = find(strcmp(trainingClassifierData.activity(removeInd),uniqStates(i)));
@@ -864,6 +864,29 @@ end
 codesTrue = zeros(1,length(statesTrue));
 for i = 1:length(statesTrue)
     codesTrue(i) = find(strcmp(statesTrue{i},uniqStates));
+end
+
+%REMOVE STAIRS FOR SPECIFIC SUBJECTS
+if ~isempty(find(subject_stairs==subject_analyze, 1))
+    stairs_ind = [find(codesTrue == 2) find(codesTrue == 3)];
+    if ~isempty(stairs_ind)
+        %Remove stairs training data:
+        features(stairs_ind,:) = [];
+        statesTrue(stairs_ind) = [];
+        subjects(stairs_ind) = [];
+        codesTrue(stairs_ind) = [];
+        uniqStates([2 3]) = []; %only three classes remaining
+        
+        %Update codesTrue to use 1 2 3 (not 1 4 5)
+        temp = find(codesTrue == 4);
+        codesTrue(temp) = 2;
+        temp = find(codesTrue == 5);
+        codesTrue(temp) = 3;
+        
+        fprintf(2,'Stairs data removed from training data.\n')
+    else
+        fprintf(2,'No stairs data found in training data.\n')
+    end
 end
 
 %Store Code and label of each unique State
@@ -1036,7 +1059,7 @@ if data_removed == 0
 else
     title({['CBR' subj_str ' - ' upper(brace_analyze)],['Data Removed: ' data_removed_str(1:5) '%']},'FontSize',18)
 end
-for ii = 1:5
+for ii = 1:length(uniqStates)
     hold on
     activity_tally_HR = activity_tally.*(6/3600); %convert # of clips to hours
     plot(activity_tally_HR(ii,:),'LineWidth',2)
@@ -1066,16 +1089,18 @@ legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar.png'])
 
 %Stairs Per Day (BOX)
-figure('name','Stairclimbing Time Distribution','units','normalized','outerposition',[0 0 1 1])
-Up = activity_tally_HR(2,:).*60; %convert to minutes
-Dw = activity_tally_HR(3,:).*60; %convert to minutes
-Stairs = [Up' Dw'];
-boxplot(Stairs,'labels',StateCodes(2:3,1))
-medstairs = median(sum(Stairs,2))
-title({['Distribution of Stairclimbing Time | CBR' subj_str ' - ' upper(brace_analyze)], ['Median = ' num2str(medstairs) ' min']},'FontSize',18)
-ylabel('Time [min]','FontSize',18)
-set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold');
-export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
+if length(uniqStates) == 5
+    figure('name','Stairclimbing Time Distribution','units','normalized','outerposition',[0 0 1 1])
+    Up = activity_tally_HR(2,:).*60; %convert to minutes
+    Dw = activity_tally_HR(3,:).*60; %convert to minutes
+    Stairs = [Up' Dw'];
+    boxplot(Stairs,'labels',StateCodes(2:3,1))
+    medstairs = median(sum(Stairs,2))
+    title({['Distribution of Stairclimbing Time | CBR' subj_str ' - ' upper(brace_analyze)], ['Median = ' num2str(medstairs) ' min']},'FontSize',18)
+    ylabel('Time [min]','FontSize',18)
+    set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold');
+    export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_DistrStairs.png'])
+end
 
 %Activity Profile (BAR) - Normalized by Day to Percentages
 activity_tally_HR_norm = zeros(size(activity_tally_HR));
