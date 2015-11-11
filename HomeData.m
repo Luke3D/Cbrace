@@ -757,7 +757,7 @@ if ExtractWearFeatures
     fprintf('\n')
     disp('Remaining Wearing Data:');
     while hasdata(ds)
-        fprintf(['Chunk: ' num2str(chk_counter) ' | Reading all.']);
+        fprintf(['Chunk: ' num2str(chk_counter) ' | Reading all.\n']);
 
         imp = read(ds);
         timestamp = imp.Timestamp;
