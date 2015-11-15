@@ -1,4 +1,4 @@
-%% Multiple RF Classifier - Session Wise
+%% Hierarchal RF Classifier - Session Wise
 %Aakash Gupta (Nov. 5, 2015)
 
 %% LOAD DATA AND INITIALIZE PARAMETERS
@@ -23,7 +23,6 @@ drawplot.confmat = 1;
 
 %Additional options
 clipThresh = 0; %to be in training set, clips must have >X% of label
-
 OOBVarImp = 'off';   %enable variable importance measurement
 
 %The HMM Transition Matrix (A)
@@ -185,12 +184,16 @@ TF_mat = cell(2,5);
 testSet = false(length(statesTrue),1);
 
 %Get codes for the true static/dynamic states
-codesTrueBinary = zeros(1,length(statesTrue));
+codesBinary = zeros(1,length(statesTrue));
+static_ind = [];
+dynamic_ind = [];
 for j = 1:length(statesTrue)
     if strcmp(statesTrue{j},'Sitting') || strcmp(statesTrue{j},'Standing')
-        codesTrueBinary(j) = 1; %STATIC = 1
+        codesBinary(j) = 1; %STATIC = 1
+        static_ind = [static_ind; j];
     else
-        codesTrueBinary(j) = 2; %DYNAMIC = 2
+        codesBinary(j) = 2; %DYNAMIC = 2
+        dynamic_ind = [dynamic_ind; j];
     end
 end
 
@@ -219,16 +222,23 @@ folds = length(ind_change) - 1; %number of folds = number of sessions
 activity_acc_matrix = zeros(5,folds);
 
 %Do k fold cross validation for RF
+codesRF = zeros(length(codesBinary),1);
+codesBinaryRF = zeros(length(codesBinary),1);
 for k = 1:folds
     %% Create Train and Test vector - Split dataset into k-folds
     testSet = zeros(length(statesTrue),1);
     testSet(ind_change(k):ind_change(k+1)) = 1;
-    testSet = logical(testSet);
+    testSet = logical(testSet);    
     
     %Remove clips that are a mix of activities from training set
     %These were the clips that did not meet the 80% threshold
     TrainingSet = ~testSet;
     TrainingSet(removeInd) = 0;   %remove clips
+    
+    %Sort TrainingSet into dynamic and static
+    for ii = 1:length(codesBinary(TrainingSet))
+        
+    end
     
     %% RF TRAINING AND TESTING
     
@@ -240,11 +250,13 @@ for k = 1:folds
     CostM(2,:) = 5; CostM(2,2) = 0;    %increase cost of misclassifying stairs
     CostM(3,:) = 5; CostM(3,3) = 0;
     
-    tic; %start timer
+    %Sort Training Set into Static/Dynamic
+    staticTrain = find(TrainingSet == 1 & codesBinary' == 1);
+    dynamicTrain = find(TrainingSet == 1 & codesBinary' == 2);
     
     fprintf('\n')
     disp(['RF Train - Fold '  num2str(k) '  #Samples Train = ' num2str(N_session - (ind_change(k+1)-ind_change(k))) '  #Samples Test = ' num2str((ind_change(k+1)-ind_change(k)))]);
-    
+
     %How many samples of each activity we have in the test fold
     for i = 1:length(uniqStates)
         inda = find(strcmp(cData.activity(testSet),uniqStates(i)));
@@ -254,22 +266,38 @@ for k = 1:folds
         disp([num2str(Nsa) ' Samples of ' uniqStates{i} ' in this fold  (' num2str(Nsaperc) '% of total)'])
     end
 
+    %Train Three Classifiers (Binary, Static, Dynamic)
+    tic; %start timer    
     opts_ag = statset('UseParallel',1);
-    RFmodelBinary = TreeBagger(ntrees,features(TrainingSet,:),codesTrueBinary(TrainingSet)','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
-    RFmodel = TreeBagger(ntrees,features(TrainingSet,:),codesTrue(TrainingSet)','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
+    RFmodelBinary = TreeBagger(ntrees,features(TrainingSet,:),codesBinary(TrainingSet)','OOBVarImp',OOBVarImp,'Options',opts_ag);
+    RFmodelStatic = TreeBagger(ntrees,features(staticTrain,:),codesTrue(staticTrain)','OOBVarImp',OOBVarImp,'Options',opts_ag);
+    RFmodelDynamic = TreeBagger(ntrees,features(dynamicTrain,:),codesTrue(dynamicTrain)','OOBVarImp',OOBVarImp,'Options',opts_ag);
     
     timeRF = toc; %end timer
-      
-    %RF Prediction and RF class probabilities for ENTIRE dataset. This is
-    %for initializing the HMM Emission matrix (P_RF(TrainSet)) and for
-    %computing the observations of the HMM (P_RF(TestSet))
-    [codesRF,P_RF] = predict(RFmodel,features);
-    codesRF = str2num(cell2mat(codesRF));
-    statesRF = uniqStates(codesRF);
     
+    %RF Prediction - BINARY
+    [binaryRF,~] = predict(RFmodelBinary,features(testSet,:));
+    codesBinaryRF(testSet) = str2num(cell2mat(binaryRF));
+    statesBinaryRF(testSet) = uniqStates(codesBinaryRF(testSet));
+    
+    %RF Preidction - STATIC vs. DYNAMIC
+    staticTest = find(testSet == 1 & codesBinaryRF == 1);
+    dynamicTest = find(testSet == 1 & codesBinaryRF == 2);
+    static = predict(RFmodelStatic,features(staticTest,:));
+    codesRF(staticTest) = str2num(cell2mat(static));
+    dynamic = predict(RFmodelDynamic,features(dynamicTest,:));
+    codesRF(dynamicTest) = str2num(cell2mat(dynamic));
+
     %% RESULTS for each k-fold
     %entire classification matrix (HMM prediction is run only on Test data)
+    [matRF,accRF_Binary,labels] = createConfusionMatrix(codesBinary(testSet),codesBinaryRF(testSet));
+    [matRF,accRF_Static,labels] = createConfusionMatrix(codesTrue(staticTest),codesRF(staticTest));
+    [matRF,accRF_Dynamic,labels] = createConfusionMatrix(codesTrue(dynamicTest),codesRF(dynamicTest));
     [matRF,accRF,labels] = createConfusionMatrix(codesTrue(testSet),codesRF(testSet));
+    disp(['Binary Accuracy: ' num2str(accRF_Binary)])
+    disp(['Static Accuracy: ' num2str(accRF_Static)])
+    disp(['Dynamic Accuracy: ' num2str(accRF_Dynamic)])
+    disp(['Total Accuracy: ' num2str(accRF)])
     
     %Store all results
     results(k).stateCodes        = StateCodes;
@@ -426,27 +454,3 @@ var_name(end) = {'Mean'};
 
 activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
 disp(activity_tbl)
-
-%% True/False Positive Distributions
-figure('name','True/False Positives')
-count = 1;
-for ii = 1:length(uniqStates)
-    bins = 10;
-    [N_TP, ~] = histcounts(TF_mat{1,count},bins);
-    [N_FP, ~] = histcounts(TF_mat{2,count},bins);
-    y_max = max([N_TP N_FP])*1.2;
-    
-    subplot(2,5,count)
-    histogram(TF_mat{1,count},bins)
-    title(['True Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-    
-    subplot(2,5,count+5)
-    histogram(TF_mat{2,count},bins)
-    title(['False Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-
-    count = count + 1;
-end
