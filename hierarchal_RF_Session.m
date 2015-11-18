@@ -298,159 +298,159 @@ for k = 1:folds
     disp(['Static Accuracy: ' num2str(accRF_Static)])
     disp(['Dynamic Accuracy: ' num2str(accRF_Dynamic)])
     disp(['Total Accuracy: ' num2str(accRF)])
-    
-    %Store all results
-    results(k).stateCodes        = StateCodes;
-    %OVERALL ACCURACY
-    results(k).accRF             = accRF;
-    %CONFUSION MATRICES
-    results(k).matRF             = matRF;
-    %PRED and ACTUAL CODES AND STATES
-    results(k).statesRF         = statesRF(testSet);
-    results(k).statesTrue       = statesTrue(testSet);
-    results(k).trainingSet      = TrainingSet;
-    results(k).testSet          = testSet;
-%     results(k).codesTrue       = codesTrue(testSet);
-%     results(k).codesRF         = codesRF(testSet);
-%     results(k).codesHmm        = codesHmm;
-     
-    disp(['accRF = ' num2str(accRF)]);
-    disp(['Train Time RF = ' num2str(timeRF) ' s'])
-    
-    %% PLOT PREDICTED AND ACTUAL STATES
-    
-    %Rename states for plot efficiency
-    StateCodes(:,1) = {'Sit','Stairs Dw','Stairs Up','Stand','Walk'};
-    nstates = length(StateCodes);
-
-    if plotON
-        if drawplot.actvstime
-            dt = cData.clipdur * (1-cData.clipoverlap);
-            t = 0:dt:dt*(length(codesTrue(testSet))-1);  
-            figure('name',['k-fold ' num2str(k)]); hold on
-            subplot(211), hold on
-            plot(t,codesTrue(testSet),'.-g')
-            plot(t,codesRF(testSet)+.1,'.-r')
-            xlabel('Time [s]')
-            legend('True','RF')
-            ylim([0.5 nstates+0.5]);
-            set(gca,'YTick',cell2mat(StateCodes(:,2))')
-            set(gca,'YTickLabel',StateCodes(:,1))
-            subplot(212)
-            plot(t,max(P_RF(testSet,:),[],2),'r'), hold on
-            line([0 t(end)],[1/nstates 1/nstates])
-        end
-            
-        if drawplot.confmat
-            figure('name',['k-fold ' num2str(k)]); hold on
-            correctones = sum(matRF,2);
-            correctones = repmat(correctones,[1 size(StateCodes,1)]);
-            imagesc(matRF./correctones); colorbar
-            set(gca,'XTick',[1:5],'XTickLabel',StateCodes(:,1))
-            set(gca,'YTick',[1:5],'YTickLabel',StateCodes(:,1))
-            axis square
-            
-            activity_acc_matrix(:,k) = diag(matRF./correctones);
-        end
-    end
-    
-    for ii = 1:length(uniqStates)
-        cT = codesTrue(testSet);
-        cRF = codesRF(testSet);
-        
-        idx = find(cRF == ii);
-        P_RF_temp = P_RF(testSet,ii);
-        P_RF_activity = P_RF_temp(idx);
-        TP_ind = find(cRF(idx) == cT(idx)'); %find indices of true postive
-        FP_ind = find(~(cRF(idx) == cT(idx)')); %find indices of false
-        
-        TF_mat{1,ii} = [TF_mat{1,ii}; P_RF_activity(TP_ind)]; 
-        TF_mat{2,ii} = [TF_mat{2,ii}; P_RF_activity(FP_ind)];
-    end
-    
 end
-
-%Display % of each activity over all predictions
-if drawplot.activities
-    Activity = uniqStates;
-    for a = 1:size(StateCodes,1)
-        ind = [];  %temp var to store activity found
-        for k = 1:folds
-            ind = [ind; strcmp(results(k).statesRF,Activity{a})];
-        end
-        Activity{a,2} = sum(ind)./size(ind,1)*100;  % the % of each activity 
-    end 
-    figure('name','% of activities')
-    pchart = pie(cell2mat(Activity(:,2)),StateCodes(:,1));
-%     bar(cell2mat(Activity(:,2)));
-%     set(gca,'XTickLabel',StateCodes(:,1))
-%     ylabel('% of time spent')
-end
-
-%Average accuracy over all folds (weighted and unweighted)
-accRF = 0; matRF = zeros(nstates); accRF_uw = 0;
-for i = 1:folds
-    accRF = accRF + results(i).accRF.*(ind_change(i+1)-ind_change(i)); %weighted average
-    correctones = sum(results(i).matRF,2);
-    correctones = repmat(correctones,[1 size(StateCodes,1)]);
-    matRF = matRF + (results(i).matRF)./correctones;
-end
-accRF_uw = sum([results(:).accRF])/folds;
-accRF = accRF/N_session;
-fprintf('\n')
-disp(['Unweighted Mean (k-fold) accRF = ' num2str(accRF_uw)]);
-disp(['Weighted Mean (k-fold) accRF = ' num2str(accRF)]);
-
-matRF = matRF./folds;
-figure('name','Mean (k-fold) Confusion matrix')
-imagesc(matRF); 
-colorbar
-[cmin,cmax] = caxis;
-caxis([0,1])
-ax = gca;
-ax.XTick = 1:size(StateCodes,1);
-ax.YTick = 1:size(StateCodes,1);
-set(gca,'XTickLabel',{})
-set(gca,'YTickLabel',StateCodes(:,1))
-axis square
-
-%% SAVE TRAINED MODELS
-% Results.results = results;
-% Results.RFmodel = RFmodel;
-% Results.HMMmodel = HMMmodel;
-% filename = ['Results_' cData.subject{1}];
-% save(filename,'Results');
-
-toc
-
-%% Accuracy Table
-test_size = zeros(folds+2,1);
-train_size = zeros(folds+2,1);
-row_folds = cell(folds+2,1);
-for ii = 1:folds
-    test_size(ii) = (ind_change(ii+1)-ind_change(ii));
-    train_size(ii) = N_session - (ind_change(ii+1)-ind_change(ii));
-    row_folds(ii) = {['Fold ' num2str(ii)]};
-end
-
-row_folds(end-1) = {'Mean (UW)'};
-row_folds(end) =  {'Mean (W)'};
-
-acc_RF_vector = [results.accRF accRF_uw accRF]';
-
-acc_tbl = table(test_size,train_size,acc_RF_vector,'RowNames',row_folds,'VariableNames',{'Test_Size','Train_Size','RF_Acc'});
-fprintf('\n')
-disp(acc_tbl)
-
-%% Activity Accuracy Table
-temp2 = mean(activity_acc_matrix');
-activity_acc = [activity_acc_matrix temp2'];
-act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
-var_name = cell(folds+1,1);
-for ii = 1:folds
-    var_name(ii) = {['Fold_' num2str(ii)]};
-end
-var_name(end) = {'Mean'};
-
-activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
-disp(activity_tbl)
+% 
+%     %Store all results
+%     results(k).stateCodes        = StateCodes;
+%     %OVERALL ACCURACY
+%     results(k).accRF             = accRF;
+%     %CONFUSION MATRICES
+%     results(k).matRF             = matRF;
+%     %PRED and ACTUAL CODES AND STATES
+%     results(k).statesTrue       = statesTrue(testSet);
+%     results(k).trainingSet      = TrainingSet;
+%     results(k).testSet          = testSet;
+% %     results(k).codesTrue       = codesTrue(testSet);
+% %     results(k).codesRF         = codesRF(testSet);
+% %     results(k).codesHmm        = codesHmm;
+%      
+%     disp(['accRF = ' num2str(accRF)]);
+%     disp(['Train Time RF = ' num2str(timeRF) ' s'])
+%     
+%     %% PLOT PREDICTED AND ACTUAL STATES
+%     
+%     %Rename states for plot efficiency
+%     StateCodes(:,1) = {'Sit','Stairs Dw','Stairs Up','Stand','Walk'};
+%     nstates = length(StateCodes);
+% 
+%     if plotON
+%         if drawplot.actvstime
+%             dt = cData.clipdur * (1-cData.clipoverlap);
+%             t = 0:dt:dt*(length(codesTrue(testSet))-1);  
+%             figure('name',['k-fold ' num2str(k)]); hold on
+%             subplot(211), hold on
+%             plot(t,codesTrue(testSet),'.-g')
+%             plot(t,codesRF(testSet)+.1,'.-r')
+%             xlabel('Time [s]')
+%             legend('True','RF')
+%             ylim([0.5 nstates+0.5]);
+%             set(gca,'YTick',cell2mat(StateCodes(:,2))')
+%             set(gca,'YTickLabel',StateCodes(:,1))
+%             subplot(212)
+%             plot(t,max(P_RF(testSet,:),[],2),'r'), hold on
+%             line([0 t(end)],[1/nstates 1/nstates])
+%         end
+%             
+%         if drawplot.confmat
+%             figure('name',['k-fold ' num2str(k)]); hold on
+%             correctones = sum(matRF,2);
+%             correctones = repmat(correctones,[1 size(StateCodes,1)]);
+%             imagesc(matRF./correctones); colorbar
+%             set(gca,'XTick',[1:5],'XTickLabel',StateCodes(:,1))
+%             set(gca,'YTick',[1:5],'YTickLabel',StateCodes(:,1))
+%             axis square
+%             
+%             activity_acc_matrix(:,k) = diag(matRF./correctones);
+%         end
+%     end
+%     
+%     for ii = 1:length(uniqStates)
+%         cT = codesTrue(testSet);
+%         cRF = codesRF(testSet);
+%         
+%         idx = find(cRF == ii);
+%         P_RF_temp = P_RF(testSet,ii);
+%         P_RF_activity = P_RF_temp(idx);
+%         TP_ind = find(cRF(idx) == cT(idx)'); %find indices of true postive
+%         FP_ind = find(~(cRF(idx) == cT(idx)')); %find indices of false
+%         
+%         TF_mat{1,ii} = [TF_mat{1,ii}; P_RF_activity(TP_ind)]; 
+%         TF_mat{2,ii} = [TF_mat{2,ii}; P_RF_activity(FP_ind)];
+%     end
+%     
+% end
+% 
+% %Display % of each activity over all predictions
+% if drawplot.activities
+%     Activity = uniqStates;
+%     for a = 1:size(StateCodes,1)
+%         ind = [];  %temp var to store activity found
+%         for k = 1:folds
+%             ind = [ind; strcmp(results(k).statesRF,Activity{a})];
+%         end
+%         Activity{a,2} = sum(ind)./size(ind,1)*100;  % the % of each activity 
+%     end 
+%     figure('name','% of activities')
+%     pchart = pie(cell2mat(Activity(:,2)),StateCodes(:,1));
+% %     bar(cell2mat(Activity(:,2)));
+% %     set(gca,'XTickLabel',StateCodes(:,1))
+% %     ylabel('% of time spent')
+% end
+% 
+% %Average accuracy over all folds (weighted and unweighted)
+% accRF = 0; matRF = zeros(nstates); accRF_uw = 0;
+% for i = 1:folds
+%     accRF = accRF + results(i).accRF.*(ind_change(i+1)-ind_change(i)); %weighted average
+%     correctones = sum(results(i).matRF,2);
+%     correctones = repmat(correctones,[1 size(StateCodes,1)]);
+%     matRF = matRF + (results(i).matRF)./correctones;
+% end
+% accRF_uw = sum([results(:).accRF])/folds;
+% accRF = accRF/N_session;
+% fprintf('\n')
+% disp(['Unweighted Mean (k-fold) accRF = ' num2str(accRF_uw)]);
+% disp(['Weighted Mean (k-fold) accRF = ' num2str(accRF)]);
+% 
+% matRF = matRF./folds;
+% figure('name','Mean (k-fold) Confusion matrix')
+% imagesc(matRF); 
+% colorbar
+% [cmin,cmax] = caxis;
+% caxis([0,1])
+% ax = gca;
+% ax.XTick = 1:size(StateCodes,1);
+% ax.YTick = 1:size(StateCodes,1);
+% set(gca,'XTickLabel',{})
+% set(gca,'YTickLabel',StateCodes(:,1))
+% axis square
+% 
+% %% SAVE TRAINED MODELS
+% % Results.results = results;
+% % Results.RFmodel = RFmodel;
+% % Results.HMMmodel = HMMmodel;
+% % filename = ['Results_' cData.subject{1}];
+% % save(filename,'Results');
+% 
+% toc
+% 
+% %% Accuracy Table
+% test_size = zeros(folds+2,1);
+% train_size = zeros(folds+2,1);
+% row_folds = cell(folds+2,1);
+% for ii = 1:folds
+%     test_size(ii) = (ind_change(ii+1)-ind_change(ii));
+%     train_size(ii) = N_session - (ind_change(ii+1)-ind_change(ii));
+%     row_folds(ii) = {['Fold ' num2str(ii)]};
+% end
+% 
+% row_folds(end-1) = {'Mean (UW)'};
+% row_folds(end) =  {'Mean (W)'};
+% 
+% acc_RF_vector = [results.accRF accRF_uw accRF]';
+% 
+% acc_tbl = table(test_size,train_size,acc_RF_vector,'RowNames',row_folds,'VariableNames',{'Test_Size','Train_Size','RF_Acc'});
+% fprintf('\n')
+% disp(acc_tbl)
+% 
+% %% Activity Accuracy Table
+% temp2 = mean(activity_acc_matrix');
+% activity_acc = [activity_acc_matrix temp2'];
+% act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
+% var_name = cell(folds+1,1);
+% for ii = 1:folds
+%     var_name(ii) = {['Fold_' num2str(ii)]};
+% end
+% var_name(end) = {'Mean'};
+% 
+% activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
+% disp(activity_tbl)
