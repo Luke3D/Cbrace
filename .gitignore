@@ -4,3 +4,7 @@ Testdata/
 Traindata/
 *.asv
 .DS_Store
+
+*.m~
+
+*.m~

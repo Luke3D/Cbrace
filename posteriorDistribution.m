@@ -1,10 +1,5 @@
-%% NEW RF-HMM CODE for Train/Test - 1 Location Only (Belt)
-%Rev by Luca Lonini 11.18.2013
-%ver2: Save RF and HMM models and accuracies
-%ver3: Shows how many clips of each activity type we are removing
-%Init HMM Emission Prob with PTrain from the RF
-%and Run the RF+HMM on ALL data
-%ver TIME: grab data for folds sequentially over time
+%% Posterior Distribution Thresholding for Unknown Data
+% Aakash Gupta (November 21, 2015)
 
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
@@ -21,10 +16,10 @@ addpath([pwd slashdir 'sub']); %create path to helper scripts
 addpath(genpath([slashdir 'Traindata'])); %add path for train data
 
 plotON = 1;                             %draw plots
-drawplot.activities = 1;                % show % of each activity
+drawplot.activities = 0;                % show % of each activity
 drawplot.accuracy = 0;
-drawplot.actvstime = 1;
-drawplot.confmat = 1;
+drawplot.actvstime = 0;
+drawplot.confmat = 0;
 
 %Additional options
 clipThresh = 0; %to be in training set, clips must have >X% of label
@@ -460,10 +455,10 @@ end
 figure('name','Posterior Distributions by Class')
 thresh = zeros(length(uniqStates),1);
 bins = 20;
-cutoff = 2.5;
+cutoff = 2.5; %cutoff percentile in percentage
 for ii = 1:length(uniqStates)
     id = find(codesRF == ii); %get chosen activities (max posteriors)
-    thresh(ii) = prctile(max(P_all(id,:),[],2),cutoff);
+    thresh(ii) = prctile(max(P_all(id,:),[],2),cutoff); %find posterior threshold from cutoff
     
     subplot(1,5,ii)
     histogram(max(P_all(id,:),[],2),bins);
@@ -471,5 +466,36 @@ for ii = 1:length(uniqStates)
     xlim([0 1])
     yL = get(gca,'YLim');
     line([thresh(ii) thresh(ii)],yL,'Color','r');
-    %ylim([0 y_max])
 end
+
+%% Train RF Classifier On All Lab Data
+RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
+
+%Directory
+cd ../
+ARCode = pwd;
+unk_folder = [ARCode '/unknown_data/HAPT/RawData/'];
+addpath(unk_folder)
+%% Import Unknown Data + Process Data
+%Import labels
+filename = [unk_folder 'labels.txt'];
+delimiter = ' ';
+formatSpec = '%f%f%f%f%f%[^\n\r]';
+fileID = fopen(filename,'r');
+dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'MultipleDelimsAsOne', true,  'ReturnOnError', false);
+fclose(fileID);
+unk_labels = [dataArray{1:end-1}];
+unk_labels(:,1) = []; %remove first column (experiment #)
+clear dataArray
+
+%Data Information
+
+%Import Raw Data
+
+%Resample Data
+
+%Generate clips/features
+
+%% Predict on Unknown Data
+
+%% Threshold and Determine Unknown/Known
