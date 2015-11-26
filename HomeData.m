@@ -90,7 +90,7 @@ if use_lab
     %Set up directories for this subject
     if subject_analyze < 10
         subj_str = ['0' num2str(subject_analyze)];
-    elseif subject_analyze > 10
+    elseif subject_analyze > 9
         subj_str = num2str(subject_analyze);
     end
 
@@ -272,7 +272,7 @@ if use_home
     %Set up directories for this subject
     if subject_analyze < 10
         subj_str = ['0' num2str(subject_analyze)];
-    elseif subject_analyze > 10
+    elseif subject_analyze > 9
         subj_str = num2str(subject_analyze);
     end
     
@@ -421,7 +421,7 @@ fprintf(2,'FOR TESTING HOME DATA:\n')
 subject_analyze = input('Enter subject ID to analyze: ');
 if subject_analyze < 10
     subj_str = ['0' num2str(subject_analyze)];
-elseif subject_analyze > 10
+elseif subject_analyze > 9
     subj_str = num2str(subject_analyze);
 end
 

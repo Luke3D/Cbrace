@@ -9,11 +9,22 @@ if isempty(p)
     parpool('local')
 end
 
+cd(fileparts(which('posteriorDistribution.m')))
+currentDir = pwd;
 slashdir = '/';
-
-currentDir = pwd; 
 addpath([pwd slashdir 'sub']); %create path to helper scripts
-addpath(genpath([slashdir 'Traindata'])); %add path for train data
+cd ../
+ARCode = pwd;
+code_folder = [ARCode '/code/'];
+unk_folder = [ARCode '/unknown_data/'];
+HAPT_folder = [ARCode '/unknown_data/HAPT/'];
+HAPT_raw_folder = [ARCode '/unknown_data/HAPT/RawData/'];
+HAPT_feat_folder = [ARCode '/unknown_data/HAPT/Features/'];
+addpath(unk_folder)
+addpath(HAPT_folder)
+addpath(HAPT_raw_folder)
+addpath(HAPT_feat_folder)
+addpath(code_folder)
 
 plotON = 1;                             %draw plots
 drawplot.activities = 0;                % show % of each activity
@@ -414,19 +425,6 @@ acc_tbl = table(test_size,train_size,acc_RF_vector,'RowNames',row_folds,'Variabl
 fprintf('\n')
 disp(acc_tbl)
 
-%% Activity Accuracy Table
-temp2 = mean(activity_acc_matrix');
-activity_acc = [activity_acc_matrix temp2'];
-act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
-var_name = cell(folds+1,1);
-for ii = 1:folds
-    var_name(ii) = {['Fold_' num2str(ii)]};
-end
-var_name(end) = {'Mean'};
-
-activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
-disp(activity_tbl)
-
 %% True/False Positive Distributions
 figure('name','True/False Positives')
 count = 1;
@@ -455,7 +453,7 @@ end
 figure('name','Posterior Distributions by Class')
 thresh = zeros(length(uniqStates),1);
 bins = 20;
-cutoff = 2.5; %cutoff percentile in percentage
+cutoff = 5; %cutoff percentile in percentage
 for ii = 1:length(uniqStates)
     id = find(codesRF == ii); %get chosen activities (max posteriors)
     thresh(ii) = prctile(max(P_all(id,:),[],2),cutoff); %find posterior threshold from cutoff
@@ -471,31 +469,56 @@ end
 %% Train RF Classifier On All Lab Data
 RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
 
-%Directory
-cd ../
-ARCode = pwd;
-unk_folder = [ARCode '/unknown_data/HAPT/RawData/'];
-addpath(unk_folder)
 %% Import Unknown Data + Process Data
 %Import labels
-filename = [unk_folder 'labels.txt'];
+filename = [HAPT_raw_folder 'labels.txt'];
 delimiter = ' ';
 formatSpec = '%f%f%f%f%f%[^\n\r]';
 fileID = fopen(filename,'r');
 dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'MultipleDelimsAsOne', true,  'ReturnOnError', false);
 fclose(fileID);
 unk_labels = [dataArray{1:end-1}];
-unk_labels(:,1) = []; %remove first column (experiment #)
 clear dataArray
 
-%Data Information
+%Import unknown data
+X_unk = [];
+HAPT_subjects = [1:30];
+for kk = 1:length(HAPT_subjects)
+    if HAPT_subjects(kk) < 10
+        unk_subj_str = ['0' num2str(HAPT_subjects(kk))];
+    elseif HAPT_subjects(kk) > 9
+        unk_subj_str = num2str(HAPT_subjects(kk));
+    end
+    
+    file_unk = [HAPT_feat_folder 'HAPT_' unk_subj_str '.mat'];
+    load(file_unk)
+    X_unk = [X_unk; X_all];
+end
 
-%Import Raw Data
+%% Predict on Unknown Data + Threshold
+fprintf('\n')
+disp('Predicting on unknown data.')
+[codesRF_unk,P_RF_unk] = predict(RFmodel_all,X_unk);
 
-%Resample Data
+[M, I] = max(P_RF_unk,[],2);
+n_total = length(M);
+n_correct = length(find(M < thresh(I)));
+acc_unk = n_correct./n_total;
+disp(['Correctly classified as unknown: ' num2str(acc_unk)])
 
-%Generate clips/features
-
-%% Predict on Unknown Data
-
-%% Threshold and Determine Unknown/Known
+%% Optimize Threshold Values
+n_total = length(M);
+it = [0:0.05:1];
+unk_mat = zeros(length(it),length(thresh));
+for ii = 1:length(thresh)
+    thresh_it = thresh;
+    for tt = 1:length(it)
+        thresh_it(ii) = it(tt);        
+        unk_mat(tt,ii) = (length(find(M < thresh_it(I))))./n_total;
+    end
+end
+plot(it, unk_mat,'LineWidth',3);
+legend(StateCodes(:,1))
+xlabel('Threshold Value','FontSize',18)
+ylabel('Correctly Classified as Unknown','FontSize',18)
+set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
