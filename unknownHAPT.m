@@ -9,7 +9,7 @@ if isempty(p)
     parpool('local')
 end
 
-cd(fileparts(which('posteriorDistribution.m')))
+cd(fileparts(which('unknownHAPT.m')))
 currentDir = pwd;
 slashdir = '/';
 addpath([pwd slashdir 'sub']); %create path to helper scripts
