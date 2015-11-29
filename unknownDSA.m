@@ -4,6 +4,8 @@
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 
+DSA_activity = [10:19]; %activities to analyze
+
 p = gcp('nocreate');
 if isempty(p)
     parpool('local')
@@ -472,7 +474,6 @@ RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost'
 %% Import Unknown Data + Process Data
 %Import unknown data
 X_unk = [];
-DSA_activity = [10:19]; %activities to analyze
 for kk = 1:length(DSA_activity)
     if DSA_activity(kk) < 10
         unk_subj_str = ['0' num2str(DSA_activity(kk))];

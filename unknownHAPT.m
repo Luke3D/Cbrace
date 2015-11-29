@@ -4,6 +4,8 @@
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 
+HAPT_subjects = [1:30];
+
 p = gcp('nocreate');
 if isempty(p)
     parpool('local')
@@ -482,7 +484,6 @@ clear dataArray
 
 %Import unknown data
 X_unk = [];
-HAPT_subjects = [1:30];
 for kk = 1:length(HAPT_subjects)
     if HAPT_subjects(kk) < 10
         unk_subj_str = ['0' num2str(HAPT_subjects(kk))];
