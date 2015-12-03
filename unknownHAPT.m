@@ -471,6 +471,34 @@ end
 %% Train RF Classifier On All Lab Data
 RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
 
+%% Import Known Data + Predict On + Threshold
+fprintf('\n')
+file_known = [ARCode '/features_patient/CBR01_SCO_p.mat'];
+disp(['Known Data: ' file_known])
+load(file_known)
+
+%Remove non-wearing
+nonwear_ind = strmatch('Not Wearing',features_data.activity_labels,'exact');
+features_data.subject(nonwear_ind) = [];
+features_data.features(nonwear_ind,:) = [];
+features_data.activity_labels(nonwear_ind) = [];
+features_data.wearing_labels(nonwear_ind) = [];
+features_data.identifier(nonwear_ind) = [];
+features_data.activity_fraction(nonwear_ind) = [];
+features_data.times(nonwear_ind) = [];
+features_data.sessionID(nonwear_ind) = [];
+features_data.subjectID(nonwear_ind) = [];
+
+fprintf('\n')
+disp('Predicting on known data.')
+[codesRF_kn,P_RF_kn] = predict(RFmodel_all,features_data.features);
+
+[M_kn, I_kn] = max(P_RF_kn,[],2);
+n_total_kn = length(M_kn);
+n_correct_kn = length(find(M_kn > thresh(I_kn))); %correct known is GREATER than thresh
+acc_kn = n_correct_kn./n_total_kn;
+disp(['Correctly classified as known: ' num2str(acc_kn)])
+
 %% Import Unknown Data + Process Data
 %Import labels
 filename = [HAPT_raw_folder 'labels.txt'];
@@ -501,25 +529,80 @@ fprintf('\n')
 disp('Predicting on unknown data.')
 [codesRF_unk,P_RF_unk] = predict(RFmodel_all,X_unk);
 
-[M, I] = max(P_RF_unk,[],2);
-n_total = length(M);
-n_correct = length(find(M < thresh(I)));
-acc_unk = n_correct./n_total;
+[M_unk, I_unk] = max(P_RF_unk,[],2);
+n_total_unk = length(M_unk);
+n_correct_unk = length(find(M_unk < thresh(I_unk))); %correct unknown is LESS than thresh
+acc_unk = n_correct_unk./n_total_unk;
 disp(['Correctly classified as unknown: ' num2str(acc_unk)])
 
 %% Optimize Threshold Values
-n_total = length(M);
-it = [0:0.05:1];
-unk_mat = zeros(length(it),length(thresh));
+%Known Data
+n_total_kn = length(M_kn);
+it = [0:0.01:1];
+kn_mat = zeros(length(it),length(thresh));
 for ii = 1:length(thresh)
-    thresh_it = thresh;
+    %thresh_it = thresh;
+    thresh_it = zeros(5,1);
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
-        unk_mat(tt,ii) = (length(find(M < thresh_it(I))))./n_total;
+        kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
     end
 end
-plot(it, unk_mat,'LineWidth',3);
-legend(StateCodes(:,1))
-xlabel('Threshold Value','FontSize',18)
-ylabel('Correctly Classified as Unknown','FontSize',18)
-set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
+
+%Unknown Data
+n_total_unk = length(M_unk);
+it = [0:0.01:1];
+unk_mat = zeros(length(it),length(thresh));
+for ii = 1:length(thresh)
+    %thresh_it = thresh;
+    thresh_it = zeros(5,1);
+    for tt = 1:length(it)
+        thresh_it(ii) = it(tt);        
+        unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
+    end
+end
+
+%Plot Known and Unknown Optimizations
+figure;
+it_max = zeros(size(unk_mat,2),1);
+for b = 1:size(unk_mat,2)
+    subplot(1,5,b)
+    hold on
+    plot(it, kn_mat(:,b),'LineWidth',3);
+    plot(it, unk_mat(:,b),'LineWidth',3);
+    
+    %Plot maximum for both
+    total = kn_mat(:,b) + unk_mat(:,b);
+    [~,it_ind] = max(total);
+    yL_2 = [0 1];
+    line([it(it_ind) it(it_ind)],yL_2,'Color','r');
+    it_max(b) = it(it_ind);
+    
+    legend('Known','Unknown')
+    xlabel('Threshold Value','FontSize',18)
+    ylabel('Accuracy','FontSize',18)
+    title({StateCodes{b,1},['Known: ' num2str(100*length(find(I_kn == b))./n_total_kn) '%'],['Unknown: ' num2str(100*length(find(I_unk == b))./n_total_unk) '%']},'FontSize',20)
+    set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
+    xlim([0 1])
+    ylim([0 1])
+    hold off
+end
+
+%% Generate Confusion Matrix for Optimized Threshold
+mat_kn_unk = zeros(2,2);
+mat_kn_unk(1,1) = length(find(M_kn > it_max(I_kn)))./n_total_kn;
+mat_kn_unk(2,2) = length(find(M_unk < it_max(I_unk)))./n_total_unk;
+mat_kn_unk(1,2) = 1 - mat_kn_unk(1,1);
+mat_kn_unk(2,1) = 1 - mat_kn_unk(2,2);
+
+figure;
+imagesc(mat_kn_unk); 
+colorbar
+caxis([0,1])
+ax = gca;
+ax.XTick = 1:2;
+ax.YTick = 1:2;
+xlabel('Predicted','FontSize',18)
+ylabel('True','FontSize',18)
+set(gca,'XTickLabel',{'Known','Unknown'},'YTickLabel',{'Known','Unknown'},'TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold')
+axis square
