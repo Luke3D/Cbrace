@@ -223,8 +223,8 @@ ind_change = [ind_change N_session]; %include last index
 folds = length(ind_change) - 1; %number of folds = number of sessions
 activity_acc_matrix = zeros(5,folds);
 
-codesRF = ones(length(statesTrue),1);
-sigma = input('Sigma: ');
+% codesRF = ones(length(statesTrue),1);
+% sigma = input('Sigma: ');
 
 %Do k fold cross validation for RF
 for k = 1:folds
@@ -278,16 +278,16 @@ for k = 1:folds
     %RF Prediction and RF class probabilities for ENTIRE dataset. This is
     %for initializing the HMM Emission matrix (P_RF(TrainingSet)) and for
     %computing the observations of the HMM (P_RF(TestSet))
-%     [codesRF,P_RF] = predict(RFmodel,features);
-%     codesRF = str2num(cell2mat(codesRF));
-%     statesRF = uniqStates(codesRF);
-%     P_all(testSet,:) = P_RF(testSet,:);
-    
-    template = templateSVM('KernelFunction', 'gaussian', 'PolynomialOrder', [], 'KernelScale', sigma, 'BoxConstraint', 1, 'Standardize', true);
-    trainedClassifier = fitcecoc(features(TrainingSet,:), codesTrue(TrainingSet)', 'Learners', template, 'FitPosterior', 1, 'Coding', 'onevsone', 'PredictorNames', cData.featureLabels, 'ResponseName', 'outcome');
-    [codesRF, ~, ~, P_RF] = predict(trainedClassifier,features);
+    [codesRF,P_RF] = predict(RFmodel,features);
+    codesRF = str2num(cell2mat(codesRF));
     statesRF = uniqStates(codesRF);
     P_all(testSet,:) = P_RF(testSet,:);
+    
+%     template = templateSVM('KernelFunction', 'gaussian', 'PolynomialOrder', [], 'KernelScale', sigma, 'BoxConstraint', 1, 'Standardize', true);
+%     trainedClassifier = fitcecoc(features(TrainingSet,:), codesTrue(TrainingSet)', 'Learners', template, 'FitPosterior', 1, 'Coding', 'onevsone', 'PredictorNames', cData.featureLabels, 'ResponseName', 'outcome');
+%     [codesRF, ~, ~, P_RF] = predict(trainedClassifier,features);
+%     statesRF = uniqStates(codesRF);
+%     P_all(testSet,:) = P_RF(testSet,:);
 
     %% RESULTS for each k-fold
     %entire classification matrix (HMM prediction is run only on Test data)
@@ -478,9 +478,8 @@ for ii = 1:length(uniqStates)
 end
 
 %% Train RF Classifier On All Lab Data
-%RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
-
-trainedClassifier_all = fitcecoc(features, codesTrue', 'Learners', template, 'FitPosterior', 1, 'Coding', 'onevsone', 'PredictorNames', cData.featureLabels, 'ResponseName', 'outcome');
+RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
+%trainedClassifier_all = fitcecoc(features, codesTrue', 'Learners', template, 'FitPosterior', 1, 'Coding', 'onevsone', 'PredictorNames', cData.featureLabels, 'ResponseName', 'outcome');
 
 %% Import Known Data + Predict On + Threshold
 fprintf('\n')
@@ -502,8 +501,8 @@ features_data.subjectID(nonwear_ind) = [];
 
 fprintf('\n')
 disp('Predicting on known data.')
-%[codesRF_kn,P_RF_kn] = predict(RFmodel_all,features_data.features);
-[codesRF_kn, ~, ~, P_RF_kn] = predict(trainedClassifier_all,features);
+[codesRF_kn,P_RF_kn] = predict(RFmodel_all,features_data.features);
+%[codesRF_kn, ~, ~, P_RF_kn] = predict(trainedClassifier_all,features);
 
 
 [M_kn, I_kn] = max(P_RF_kn,[],2);
@@ -530,8 +529,8 @@ end
 %% Predict on Unknown Data + Threshold
 fprintf('\n')
 disp('Predicting on unknown data.')
-%[codesRF_unk,P_RF_unk] = predict(RFmodel_all,X_unk);
-[codesRF_unk, ~, ~, P_RF_unk] = predict(trainedClassifier_all,features);
+[codesRF_unk,P_RF_unk] = predict(RFmodel_all,X_unk);
+%[codesRF_unk, ~, ~, P_RF_unk] = predict(trainedClassifier_all,features);
 
 
 [M_unk, I_unk] = max(P_RF_unk,[],2);
@@ -546,10 +545,12 @@ n_total_kn = length(M_kn);
 it = [0:0.01:1];
 kn_mat = zeros(length(it),length(thresh));
 for ii = 1:length(thresh)
-    thresh_it = thresh;
+    %thresh_it = thresh;
+    thresh_it = zeros(5,1);
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
         kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
+        %kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii));
     end
 end
 
@@ -558,10 +559,12 @@ n_total_unk = length(M_unk);
 it = [0:0.01:1];
 unk_mat = zeros(length(it),length(thresh));
 for ii = 1:length(thresh)
-    thresh_it = thresh;
+    %thresh_it = thresh;
+    thresh_it = zeros(5,1);    
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
         unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
+        %unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii));
     end
 end
 

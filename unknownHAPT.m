@@ -546,6 +546,7 @@ for ii = 1:length(thresh)
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
         kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
+        %kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii));
     end
 end
 
@@ -559,6 +560,7 @@ for ii = 1:length(thresh)
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
         unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
+        %unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii));
     end
 end
 
