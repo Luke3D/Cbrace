@@ -4,7 +4,7 @@
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 
-DSA_activity = [1:19]; %activities to analyze
+DSA_activity = [10:19]; %activities to analyze
 
 p = gcp('nocreate');
 if isempty(p)
@@ -532,7 +532,6 @@ disp('Predicting on unknown data.')
 [codesRF_unk,P_RF_unk] = predict(RFmodel_all,X_unk);
 %[codesRF_unk, ~, ~, P_RF_unk] = predict(trainedClassifier_all,features);
 
-
 [M_unk, I_unk] = max(P_RF_unk,[],2);
 n_total_unk = length(M_unk);
 n_correct_unk = length(find(M_unk < thresh(I_unk))); %correct unknown is LESS than thresh
@@ -549,8 +548,8 @@ for ii = 1:length(thresh)
     thresh_it = zeros(5,1);
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
-        kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
-        %kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii));
+        %kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
+        kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii));
     end
 end
 
@@ -563,8 +562,8 @@ for ii = 1:length(thresh)
     thresh_it = zeros(5,1);    
     for tt = 1:length(it)
         thresh_it(ii) = it(tt);        
-        unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
-        %unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii));
+        %unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
+        unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii));
     end
 end
 
@@ -583,6 +582,17 @@ for b = 1:size(unk_mat,2)
     yL_2 = [0 1];
     line([it(it_ind) it(it_ind)],yL_2,'Color','r');
     it_max(b) = it(it_ind);
+    
+    %Find and plot intersection of known and unknown graphs
+%     for cc = 2:length(kn_mat(:,b))-1
+%         if ((unk_mat(cc-1,b) < kn_mat(cc,b)) && (unk_mat(cc+1,b) > kn_mat(cc,b))) || (round(unk_mat(cc,b),2) == round(kn_mat(cc,b),2))
+%             it_max(b) = it(cc);
+%             break
+%         end
+%     end
+%     yL_3 = [0 1];
+%     line([it(cc) it(cc)],yL_3,'Color','b');
+%     it_max(b) = it(cc);
     
     legend('Known','Unknown')
     xlabel('Threshold Value','FontSize',18)
