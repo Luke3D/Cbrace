@@ -235,7 +235,11 @@ X_unk = X_unk(randperm(length(X_unk)),:);
 %Indices for each fold for unknown data
 ind_change_2 = [1:floor(length(X_unk)/folds):length(X_unk)];
 ind_change_2(end) = length(X_unk);
-
+if length(ind_change)~=length(ind_change_2)
+    ind_change_2 = [1:floor(length(X_unk)/folds):length(X_unk)];
+    ind_change_2(end+1) = length(X_unk);
+end
+    
 %Do k fold cross validation for RF
 for k = 1:folds
     %% Create Train and Test vector - Split dataset into k-folds
@@ -320,10 +324,6 @@ for k = 1:folds
         end
     end
     
-    %%
-    %%
-    %%
-    %%
     %% Plot Optimization Graph
     figure;
     it_max = zeros(size(unk_mat,2),1);
