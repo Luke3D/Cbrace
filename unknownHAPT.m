@@ -399,57 +399,7 @@ set(gca,'XTickLabel',{})
 set(gca,'YTickLabel',StateCodes(:,1))
 axis square
 
-%% SAVE TRAINED MODELS
-% Results.results = results;
-% Results.RFmodel = RFmodel;
-% Results.HMMmodel = HMMmodel;
-% filename = ['Results_' cData.subject{1}];
-% save(filename,'Results');
-
 toc
-
-%% Accuracy Table
-test_size = zeros(folds+2,1);
-train_size = zeros(folds+2,1);
-row_folds = cell(folds+2,1);
-for ii = 1:folds
-    test_size(ii) = (ind_change(ii+1)-ind_change(ii));
-    train_size(ii) = N_session - (ind_change(ii+1)-ind_change(ii));
-    row_folds(ii) = {['Fold ' num2str(ii)]};
-end
-
-row_folds(end-1) = {'Mean (UW)'};
-row_folds(end) =  {'Mean (W)'};
-
-acc_RF_vector = [results.accRF accRF_uw accRF]';
-
-acc_tbl = table(test_size,train_size,acc_RF_vector,'RowNames',row_folds,'VariableNames',{'Test_Size','Train_Size','RF_Acc'});
-fprintf('\n')
-disp(acc_tbl)
-
-%% True/False Positive Distributions
-figure('name','True/False Positives')
-count = 1;
-for ii = 1:length(uniqStates)
-    bins = 10;
-    [N_TP, ~] = histcounts(TF_mat{1,count},bins);
-    [N_FP, ~] = histcounts(TF_mat{2,count},bins);
-    y_max = max([N_TP N_FP])*1.2;
-    
-    subplot(2,5,count)
-    histogram(TF_mat{1,count},bins)
-    title(['True Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-    
-    subplot(2,5,count+5)
-    histogram(TF_mat{2,count},bins)
-    title(['False Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-
-    count = count + 1;
-end
 
 %% Posterior Distrubtions
 figure('name','Posterior Distributions by Class')
