@@ -90,7 +90,7 @@ if use_lab
     %Set up directories for this subject
     if subject_analyze < 10
         subj_str = ['0' num2str(subject_analyze)];
-    elseif subject_analyze > 10
+    elseif subject_analyze > 9
         subj_str = num2str(subject_analyze);
     end
 
@@ -272,7 +272,7 @@ if use_home
     %Set up directories for this subject
     if subject_analyze < 10
         subj_str = ['0' num2str(subject_analyze)];
-    elseif subject_analyze > 10
+    elseif subject_analyze > 9
         subj_str = num2str(subject_analyze);
     end
     
@@ -421,7 +421,7 @@ fprintf(2,'FOR TESTING HOME DATA:\n')
 subject_analyze = input('Enter subject ID to analyze: ');
 if subject_analyze < 10
     subj_str = ['0' num2str(subject_analyze)];
-elseif subject_analyze > 10
+elseif subject_analyze > 9
     subj_str = num2str(subject_analyze);
 end
 
@@ -977,6 +977,17 @@ t = toc;
 disp(['RF Prediction took ' num2str(t) ' seconds.'])
 codesRF = str2num(cell2mat(codesRF));
 
+%% THRESHOLD RANDOM FOREST POSTERIORS FOR UNKNOWN DATA
+%unk_thresh = [0.4883; 0.3950; 0.2717; 0.4667; 0.7650]; %CBR01-CBR
+unk_thresh = [0.5520; 0.4120; 0.4040; 0.4160; 0.7060]; %CBR01-SCO
+unk_ind = cell(5,1); %indices of unknown data
+[M, I] = max(P_RF,[],2); %get max and index for posterior matrix
+
+for ii = 1:length(unk_thresh)
+    unk_ind{ii} = find(I == ii & M < unk_thresh(I)); %find and store indices of unknown data points
+end
+
+%% RUN HMM ON RANDOM FOREST OUTPUT
 if UseHMM
     disp('Predicting with HMM')
     tic
@@ -1125,6 +1136,16 @@ ylim([0 100])
 set(gca,'Box','off','XTick',[1:length(days_plot)],'XTickLabel',days_plot,'YTick',[10:10:100],'TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
 legend({StateCodes{:,1}},'FontSize',16)
 export_fig(['CBR' subj_str '_' upper(brace_analyze) '_' file_end(7:end) '_Days_Bar_Norm.png'])
+
+%Output Unknown Data Classification
+sum = 0;
+for ii = 1:length(unk_thresh)
+    sum = sum + length(unk_ind{ii});
+end
+disp(['Percent Home Data Classified as Unknown: ' num2str(sum./(length(I))*100) '%']);
+for ii = 1:length(unk_thresh)
+    disp(['  - ' StateCodes{ii,1} ': ' num2str(length(unk_ind{ii})./length(find(I==ii))*100) '%']);
+end
 
 %% RESET CURRENT DIRECTORY
 

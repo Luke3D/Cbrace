@@ -1,25 +1,38 @@
-%% Multiple RF Classifier - Session Wise
-%Aakash Gupta (Nov. 5, 2015)
+%% Posterior Distribution Thresholding for Unknown Data
+% Aakash Gupta (November 21, 2015)
 
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
+
+HAPT_subjects = [1:30];
 
 p = gcp('nocreate');
 if isempty(p)
     parpool('local')
 end
 
+cd(fileparts(which('unknownHAPT.m')))
+currentDir = pwd;
 slashdir = '/';
-
-currentDir = pwd; 
 addpath([pwd slashdir 'sub']); %create path to helper scripts
-addpath(genpath([slashdir 'Traindata'])); %add path for train data
+cd ../
+ARCode = pwd;
+code_folder = [ARCode '/code/'];
+unk_folder = [ARCode '/unknown_data/'];
+HAPT_folder = [ARCode '/unknown_data/HAPT/'];
+HAPT_raw_folder = [ARCode '/unknown_data/HAPT/RawData/'];
+HAPT_feat_folder = [ARCode '/unknown_data/HAPT/Features/'];
+addpath(unk_folder)
+addpath(HAPT_folder)
+addpath(HAPT_raw_folder)
+addpath(HAPT_feat_folder)
+addpath(code_folder)
 
 plotON = 1;                             %draw plots
-drawplot.activities = 1;                % show % of each activity
+drawplot.activities = 0;                % show % of each activity
 drawplot.accuracy = 0;
-drawplot.actvstime = 1;
-drawplot.confmat = 1;
+drawplot.actvstime = 0;
+drawplot.confmat = 0;
 
 %Additional options
 clipThresh = 0; %to be in training set, clips must have >X% of label
@@ -179,20 +192,12 @@ for i = 1:length(uniqStates)
 end
 
 %% SORT THE DATA FOR K-FOLDS + RF TRAIN/TEST
+
 TF_mat = cell(2,5);
+P_all = zeros(length(features),length(uniqStates));
 
 %Indices for test set + set all to 0, we will specify test set soon
 testSet = false(length(statesTrue),1);
-
-%Get codes for the true static/dynamic states
-codesTrueBinary = zeros(1,length(statesTrue));
-for j = 1:length(statesTrue)
-    if strcmp(statesTrue{j},'Sitting') || strcmp(statesTrue{j},'Standing')
-        codesTrueBinary(j) = 1; %STATIC = 1
-    else
-        codesTrueBinary(j) = 2; %DYNAMIC = 2
-    end
-end
 
 %Get codes for the true states (i.e. make a number code for each state) and save code and state
 codesTrue = zeros(1,length(statesTrue));
@@ -255,8 +260,15 @@ for k = 1:folds
     end
 
     opts_ag = statset('UseParallel',1);
-    RFmodelBinary = TreeBagger(ntrees,features(TrainingSet,:),codesTrueBinary(TrainingSet)','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
     RFmodel = TreeBagger(ntrees,features(TrainingSet,:),codesTrue(TrainingSet)','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
+       
+    %Plot var importance
+    if strcmp(OOBVarImp,'on')
+        figure('name',['k-fold ' num2str(k)])
+        barh(RFmodel.OOBPermutedVarDeltaError);
+        set(gca,'ytick',1:length(cData.featureLabels),'yticklabel',cData.featureLabels)
+        grid on;
+    end
     
     timeRF = toc; %end timer
       
@@ -266,6 +278,7 @@ for k = 1:folds
     [codesRF,P_RF] = predict(RFmodel,features);
     codesRF = str2num(cell2mat(codesRF));
     statesRF = uniqStates(codesRF);
+    P_all(testSet,:) = P_RF(testSet,:);
     
     %% RESULTS for each k-fold
     %entire classification matrix (HMM prediction is run only on Test data)
@@ -386,67 +399,173 @@ set(gca,'XTickLabel',{})
 set(gca,'YTickLabel',StateCodes(:,1))
 axis square
 
-%% SAVE TRAINED MODELS
-% Results.results = results;
-% Results.RFmodel = RFmodel;
-% Results.HMMmodel = HMMmodel;
-% filename = ['Results_' cData.subject{1}];
-% save(filename,'Results');
-
 toc
 
-%% Accuracy Table
-test_size = zeros(folds+2,1);
-train_size = zeros(folds+2,1);
-row_folds = cell(folds+2,1);
-for ii = 1:folds
-    test_size(ii) = (ind_change(ii+1)-ind_change(ii));
-    train_size(ii) = N_session - (ind_change(ii+1)-ind_change(ii));
-    row_folds(ii) = {['Fold ' num2str(ii)]};
-end
-
-row_folds(end-1) = {'Mean (UW)'};
-row_folds(end) =  {'Mean (W)'};
-
-acc_RF_vector = [results.accRF accRF_uw accRF]';
-
-acc_tbl = table(test_size,train_size,acc_RF_vector,'RowNames',row_folds,'VariableNames',{'Test_Size','Train_Size','RF_Acc'});
-fprintf('\n')
-disp(acc_tbl)
-
-%% Activity Accuracy Table
-temp2 = mean(activity_acc_matrix');
-activity_acc = [activity_acc_matrix temp2'];
-act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
-var_name = cell(folds+1,1);
-for ii = 1:folds
-    var_name(ii) = {['Fold_' num2str(ii)]};
-end
-var_name(end) = {'Mean'};
-
-activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
-disp(activity_tbl)
-
-%% True/False Positive Distributions
-figure('name','True/False Positives')
-count = 1;
+%% Posterior Distrubtions
+figure('name','Posterior Distributions by Class')
+thresh = zeros(length(uniqStates),1);
+bins = 20;
+cutoff = 5; %cutoff percentile in percentage
 for ii = 1:length(uniqStates)
-    bins = 10;
-    [N_TP, ~] = histcounts(TF_mat{1,count},bins);
-    [N_FP, ~] = histcounts(TF_mat{2,count},bins);
-    y_max = max([N_TP N_FP])*1.2;
+    id = find(codesRF == ii); %get chosen activities (max posteriors)
+    thresh(ii) = prctile(max(P_all(id,:),[],2),cutoff); %find posterior threshold from cutoff
     
-    subplot(2,5,count)
-    histogram(TF_mat{1,count},bins)
-    title(['True Postive for ' uniqStates{ii}])
+    subplot(1,5,ii)
+    histogram(max(P_all(id,:),[],2),bins);
+    title({['Posteriors for ' uniqStates{ii}],['Cutoff at ' num2str(cutoff) '%: ' num2str(thresh(ii))]})
     xlim([0 1])
-    ylim([0 y_max])
-    
-    subplot(2,5,count+5)
-    histogram(TF_mat{2,count},bins)
-    title(['False Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-
-    count = count + 1;
+    yL = get(gca,'YLim');
+    line([thresh(ii) thresh(ii)],yL,'Color','r');
 end
+
+%% Train RF Classifier On All Lab Data
+RFmodel_all = TreeBagger(ntrees,features,codesTrue','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
+
+%% Import Known Data + Predict On + Threshold
+fprintf('\n')
+file_known = [ARCode '/features_patient/CBR01_SCO_p.mat'];
+disp(['Known Data: ' file_known])
+load(file_known)
+
+%Remove non-wearing
+nonwear_ind = strmatch('Not Wearing',features_data.activity_labels,'exact');
+features_data.subject(nonwear_ind) = [];
+features_data.features(nonwear_ind,:) = [];
+features_data.activity_labels(nonwear_ind) = [];
+features_data.wearing_labels(nonwear_ind) = [];
+features_data.identifier(nonwear_ind) = [];
+features_data.activity_fraction(nonwear_ind) = [];
+features_data.times(nonwear_ind) = [];
+features_data.sessionID(nonwear_ind) = [];
+features_data.subjectID(nonwear_ind) = [];
+
+fprintf('\n')
+disp('Predicting on known data.')
+[codesRF_kn,P_RF_kn] = predict(RFmodel_all,features_data.features);
+
+[M_kn, I_kn] = max(P_RF_kn,[],2);
+n_total_kn = length(M_kn);
+n_correct_kn = length(find(M_kn > thresh(I_kn))); %correct known is GREATER than thresh
+acc_kn = n_correct_kn./n_total_kn;
+disp(['Correctly classified as known: ' num2str(acc_kn)])
+
+%% Import Unknown Data + Process Data
+%Import labels
+filename = [HAPT_raw_folder 'labels.txt'];
+delimiter = ' ';
+formatSpec = '%f%f%f%f%f%[^\n\r]';
+fileID = fopen(filename,'r');
+dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'MultipleDelimsAsOne', true,  'ReturnOnError', false);
+fclose(fileID);
+unk_labels = [dataArray{1:end-1}];
+clear dataArray
+
+%Import unknown data
+X_unk = [];
+for kk = 1:length(HAPT_subjects)
+    if HAPT_subjects(kk) < 10
+        unk_subj_str = ['0' num2str(HAPT_subjects(kk))];
+    elseif HAPT_subjects(kk) > 9
+        unk_subj_str = num2str(HAPT_subjects(kk));
+    end
+    
+    file_unk = [HAPT_feat_folder 'HAPT_' unk_subj_str '.mat'];
+    load(file_unk)
+    X_unk = [X_unk; X_all];
+end
+
+%% Predict on Unknown Data + Threshold
+fprintf('\n')
+disp('Predicting on unknown data.')
+[codesRF_unk,P_RF_unk] = predict(RFmodel_all,X_unk);
+
+[M_unk, I_unk] = max(P_RF_unk,[],2);
+n_total_unk = length(M_unk);
+n_correct_unk = length(find(M_unk < thresh(I_unk))); %correct unknown is LESS than thresh
+acc_unk = n_correct_unk./n_total_unk;
+disp(['Correctly classified as unknown: ' num2str(acc_unk)])
+
+%% Optimize Threshold Values
+%Known Data
+n_total_kn = length(M_kn);
+it = [0:0.01:1];
+kn_mat = zeros(length(it),length(thresh));
+for ii = 1:length(thresh)
+    %thresh_it = thresh;
+    thresh_it = zeros(5,1);
+    for tt = 1:length(it)
+        thresh_it(ii) = it(tt);        
+        %kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
+        kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii));
+    end
+end
+
+%Unknown Data
+n_total_unk = length(M_unk);
+it = [0:0.01:1];
+unk_mat = zeros(length(it),length(thresh));
+for ii = 1:length(thresh)
+    %thresh_it = thresh;
+    thresh_it = zeros(5,1);
+    for tt = 1:length(it)
+        thresh_it(ii) = it(tt);        
+        %unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
+        unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii));
+    end
+end
+
+%Plot Known and Unknown Optimizations
+figure;
+it_max = zeros(size(unk_mat,2),1);
+for b = 1:size(unk_mat,2)
+    subplot(1,5,b)
+    hold on
+    plot(it, kn_mat(:,b),'LineWidth',3);
+    plot(it, unk_mat(:,b),'LineWidth',3);
+    
+    %Plot maximum for both
+    total = kn_mat(:,b) + unk_mat(:,b);
+    [~,it_ind] = max(total);
+    yL_2 = [0 1];
+    line([it(it_ind) it(it_ind)],yL_2,'Color','r');
+    it_max(b) = it(it_ind);
+    
+    %Find and plot intersection of known and unknown graphs
+%     for cc = 2:length(kn_mat(:,b))-1
+%         if ((unk_mat(cc-1,b) < kn_mat(cc,b)) && (unk_mat(cc+1,b) > kn_mat(cc,b))) || (round(unk_mat(cc,b),2) == round(kn_mat(cc,b),2))
+%             it_max(b) = it(cc);
+%             break
+%         end
+%     end
+%     yL_3 = [0 1];
+%     line([it(cc) it(cc)],yL_3,'Color','b');
+%     it_max(b) = it(cc);
+    
+    legend('Known','Unknown')
+    xlabel('Threshold Value','FontSize',18)
+    ylabel('Accuracy','FontSize',18)
+    title({StateCodes{b,1},['Known: ' num2str(100*length(find(I_kn == b))./n_total_kn) '%'],['Unknown: ' num2str(100*length(find(I_unk == b))./n_total_unk) '%']},'FontSize',20)
+    set(gca,'Box','off','TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold','XGrid','on');
+    xlim([0 1])
+    ylim([0 1])
+    hold off
+end
+
+%% Generate Confusion Matrix for Optimized Threshold
+mat_kn_unk = zeros(2,2);
+mat_kn_unk(1,1) = length(find(M_kn > it_max(I_kn)))./n_total_kn;
+mat_kn_unk(2,2) = length(find(M_unk < it_max(I_unk)))./n_total_unk;
+mat_kn_unk(1,2) = 1 - mat_kn_unk(1,1);
+mat_kn_unk(2,1) = 1 - mat_kn_unk(2,2);
+
+figure;
+imagesc(mat_kn_unk); 
+colorbar
+caxis([0,1])
+ax = gca;
+ax.XTick = 1:2;
+ax.YTick = 1:2;
+xlabel('Predicted','FontSize',18)
+ylabel('True','FontSize',18)
+set(gca,'XTickLabel',{'Known','Unknown'},'YTickLabel',{'Known','Unknown'},'TickDir','out','LineWidth',2,'FontSize',14,'FontWeight','bold')
+axis square
