@@ -18,6 +18,7 @@ addpath([pwd slashdir 'sub']); %create path to helper scripts
 cd ../
 ARCode = pwd;
 code_folder = [ARCode '/code/'];
+home_data_folder = [ARCode '/home_data/'];
 unk_folder = [ARCode '/unknown_data/'];
 DSA_folder = [ARCode '/unknown_data/DSA/'];
 DSA_raw_folder = [ARCode '/unknown_data/DSA/RawData/'];
@@ -27,6 +28,7 @@ addpath(DSA_folder)
 addpath(DSA_raw_folder)
 addpath(DSA_feat_folder)
 addpath(code_folder)
+addpath(home_data_folder);
 
 plotON = 1;                             %draw plots
 drawplot.activities = 0;                % show % of each activity
@@ -461,3 +463,12 @@ for m = 1:length(uniqStates)
     
     count = count + 1;
 end
+
+%% Output Averaged Optimized Thresholds
+if subject_analyze < 10
+    subj_str = ['0' num2str(subject_analyze)];
+elseif subject_analyze > 9
+    subj_str = num2str(subject_analyze);
+end
+filename = [home_data_folder 'CBR' subj_str '/' upper(brace_analyze) '_THRESH.mat'];
+save(filename,'it_avg')
