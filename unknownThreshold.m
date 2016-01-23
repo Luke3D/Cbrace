@@ -1,17 +1,18 @@
-%% Posterior Distribution Thresholding for Unknown Data
+%% Thresholding for Unknown Data
 % Aakash Gupta (November 21, 2015)
 
-%% LOAD DATA AND INITIALIZE PARAMETERS
+%% LOAD DIRECTORIES AND INITIALIZE PARAMETERS
 clear all, close all;
 
-DSA_activity = [1:19]; %activities to analyze
+DSA_activity = [1:19]; %DSA activities to analyze
+HAPT_subjects = [1:30]; %HAPT subjects to analyze
 
 p = gcp('nocreate');
 if isempty(p)
     parpool('local')
 end
 
-cd(fileparts(which('unknownDSA.m')))
+cd(fileparts(which('unknownThreshold.m')))
 currentDir = pwd;
 slashdir = '/';
 addpath([pwd slashdir 'sub']); %create path to helper scripts
@@ -23,10 +24,16 @@ unk_folder = [ARCode '/unknown_data/'];
 DSA_folder = [ARCode '/unknown_data/DSA/'];
 DSA_raw_folder = [ARCode '/unknown_data/DSA/RawData/'];
 DSA_feat_folder = [ARCode '/unknown_data/DSA/Features/'];
+HAPT_folder = [ARCode '/unknown_data/HAPT/'];
+HAPT_raw_folder = [ARCode '/unknown_data/HAPT/RawData/'];
+HAPT_feat_folder = [ARCode '/unknown_data/HAPT/Features/'];
 addpath(unk_folder)
 addpath(DSA_folder)
 addpath(DSA_raw_folder)
 addpath(DSA_feat_folder)
+addpath(HAPT_folder)
+addpath(HAPT_raw_folder)
+addpath(HAPT_feat_folder)
 addpath(code_folder)
 addpath(home_data_folder);
 
@@ -219,6 +226,8 @@ activity_acc_matrix = zeros(5,folds);
 
 %% Import Unknown Data + Split into k-folds
 X_unk = [];
+
+%Import DSA Data
 for kk = 1:length(DSA_activity)
     if DSA_activity(kk) < 10
         unk_subj_str = ['0' num2str(DSA_activity(kk))];
@@ -227,6 +236,19 @@ for kk = 1:length(DSA_activity)
     end
     
     file_unk = [DSA_feat_folder 'DSA_' unk_subj_str '.mat'];
+    load(file_unk)
+    X_unk = [X_unk; X_all];
+end
+
+%Import HAPT Data
+for kk = 1:length(HAPT_subjects)
+    if HAPT_subjects(kk) < 10
+        unk_subj_str = ['0' num2str(HAPT_subjects(kk))];
+    elseif HAPT_subjects(kk) > 9
+        unk_subj_str = num2str(HAPT_subjects(kk));
+    end
+    
+    file_unk = [HAPT_feat_folder 'HAPT_' unk_subj_str '.mat'];
     load(file_unk)
     X_unk = [X_unk; X_all];
 end
