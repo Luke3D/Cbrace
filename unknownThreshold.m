@@ -486,10 +486,9 @@ for m = 1:length(uniqStates)
     count = count + 1;
 end
 
-<<<<<<< HEAD:unknownDSA_Folds.m
 disp('OPTIMIZED THRESHOLDS:')
 it_avg
-=======
+
 %% Output Averaged Optimized Thresholds
 if subject_analyze < 10
     subj_str = ['0' num2str(subject_analyze)];
@@ -498,4 +497,3 @@ elseif subject_analyze > 9
 end
 filename = [home_data_folder 'CBR' subj_str '/' upper(brace_analyze) '_THRESH.mat'];
 save(filename,'it_avg')
->>>>>>> ef7b64d0cc32564629192e21c074c10b5582a971:unknownThreshold.m
