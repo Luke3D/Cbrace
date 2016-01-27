@@ -461,3 +461,6 @@ for m = 1:length(uniqStates)
     
     count = count + 1;
 end
+
+disp('OPTIMIZED THRESHOLDS:')
+it_avg

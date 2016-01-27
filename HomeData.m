@@ -978,8 +978,10 @@ disp(['RF Prediction took ' num2str(t) ' seconds.'])
 codesRF = str2num(cell2mat(codesRF));
 
 %% THRESHOLD RANDOM FOREST POSTERIORS FOR UNKNOWN DATA
-%unk_thresh = [0.4883; 0.3950; 0.2717; 0.4667; 0.7650]; %CBR01-CBR
-unk_thresh = [0.5520; 0.4120; 0.4040; 0.4160; 0.7060]; %CBR01-SCO
+unk_thresh = [0.4883; 0.3950; 0.2717; 0.4667; 0.7650]; %CBR01-CBR
+%unk_thresh = [0.5520; 0.4120; 0.4040; 0.4160; 0.7060]; %CBR01-SCO
+% unk_thresh = [0.5250; 0.2000; 0.3850; 0.5017; 0.6533]; %CBR05-CBR
+
 unk_ind = cell(5,1); %indices of unknown data
 [M, I] = max(P_RF,[],2); %get max and index for posterior matrix
 
