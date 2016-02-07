@@ -430,26 +430,26 @@ var_name(end) = {'Mean'};
 activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
 disp(activity_tbl)
 
-%% True/False Positive Distributions
-figure('name','True/False Positives')
-count = 1;
-for ii = 1:length(uniqStates)
-    bins = 10;
-    [N_TP, ~] = histcounts(TF_mat{1,count},bins);
-    [N_FP, ~] = histcounts(TF_mat{2,count},bins);
-    y_max = max([N_TP N_FP])*1.2;
-    
-    subplot(2,5,count)
-    histogram(TF_mat{1,count},bins)
-    title(['True Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-    
-    subplot(2,5,count+5)
-    histogram(TF_mat{2,count},bins)
-    title(['False Postive for ' uniqStates{ii}])
-    xlim([0 1])
-    ylim([0 y_max])
-
-    count = count + 1;
-end
+% %% True/False Positive Distributions
+% figure('name','True/False Positives')
+% count = 1;
+% for ii = 1:length(uniqStates)
+%     bins = 10;
+%     [N_TP, ~] = histcounts(TF_mat{1,count},bins);
+%     [N_FP, ~] = histcounts(TF_mat{2,count},bins);
+%     y_max = max([N_TP N_FP])*1.2;
+%     
+%     subplot(2,5,count)
+%     histogram(TF_mat{1,count},bins)
+%     title(['True Postive for ' uniqStates{ii}])
+%     xlim([0 1])
+%     ylim([0 y_max])
+%     
+%     subplot(2,5,count+5)
+%     histogram(TF_mat{2,count},bins)
+%     title(['False Postive for ' uniqStates{ii}])
+%     xlim([0 1])
+%     ylim([0 y_max])
+% 
+%     count = count + 1;
+% end
