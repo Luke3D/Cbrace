@@ -4,7 +4,7 @@
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 
-patient_stairs = [2 8 11 12 15];
+patient_stairs = [2 8 11 12 15]; %PATIENTS WITHOUT STAIRS
 disp(patient_stairs);
 
 p = gcp('nocreate');
