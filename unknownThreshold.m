@@ -6,6 +6,9 @@ clear all, close all;
 
 DSA_activity = [1:19]; %DSA activities to analyze
 HAPT_subjects = [1:30]; %HAPT subjects to analyze
+disp(['Analyzing ' num2str(length(DSA_activity)) ' DSA activities.'])
+disp(['Analyzing ' num2str(length(HAPT_subjects)) ' HAPT subjects.'])
+fprintf('\n')
 
 p = gcp('nocreate');
 if isempty(p)
@@ -173,9 +176,6 @@ fprintf('\n')
 
 %% FILTER DATA FOR APPROPRIATE CLASSIFICATION RUNTYPE
 
-%Remove data from other locations if required (old datasets)
-cData = removeDataWithoutLocation(cData,'Belt');
-
 %Create local variables for often used data
 features     = cData.features; %features for classifier
 subjects     = cData.subject;  %subject number
@@ -227,7 +227,7 @@ activity_acc_matrix = zeros(5,folds);
 %% Import Unknown Data + Split into k-folds
 X_unk = [];
 
-%Import DSA Data
+%Import DSA Features
 for kk = 1:length(DSA_activity)
     if DSA_activity(kk) < 10
         unk_subj_str = ['0' num2str(DSA_activity(kk))];
@@ -240,7 +240,7 @@ for kk = 1:length(DSA_activity)
     X_unk = [X_unk; X_all];
 end
 
-%Import HAPT Data
+%Import HAPT Features
 for kk = 1:length(HAPT_subjects)
     if HAPT_subjects(kk) < 10
         unk_subj_str = ['0' num2str(HAPT_subjects(kk))];
@@ -253,10 +253,10 @@ for kk = 1:length(HAPT_subjects)
     X_unk = [X_unk; X_all];
 end
 
-%Randomly Shuffle Features Matrix
+%Randomly shuffle total features matrix
 X_unk = X_unk(randperm(length(X_unk)),:);
 
-%Indices for each fold for unknown data
+%Split data into folds
 ind_change_2 = [1:floor(length(X_unk)/folds):length(X_unk)];
 ind_change_2(end) = length(X_unk);
 if length(ind_change)~=length(ind_change_2)
@@ -264,6 +264,8 @@ if length(ind_change)~=length(ind_change_2)
     ind_change_2(end+1) = length(X_unk);
 end
     
+%% RUN RANDOM FOREST ON k-FOLDS
+
 %Do k fold cross validation for RF
 for k = 1:folds
     %% Create Train and Test vector - Split dataset into k-folds
@@ -310,41 +312,39 @@ for k = 1:folds
     timeRF = toc; %end timer
     thresh = zeros(length(uniqStates),1);
       
-    %% Predict on Known Data (1 remaining fold for specified brace)
+    %% Predict on Known Data
     disp('Predicting on known data.')
     [codesRF_kn,P_RF_kn] = predict(RFmodel,features(testSet,:));    
     [M_kn, I_kn] = max(P_RF_kn,[],2);
     
-    %% Predict on Unknown Data + Threshold
+    %% Predict on Unknown Data
     disp('Predicting on unknown data.')
     [codesRF_unk,P_RF_unk] = predict(RFmodel,X_unk(testSet_unk,:));
     [M_unk, I_unk] = max(P_RF_unk,[],2);
     
     %% Optimize Threshold Values
     disp('Optimizing thresholds.')
+    it = [(1/length(uniqStates)):0.01:1]; %Threshold iterations from lowest posterior to maximum of one
+        
     %Known Data
-    n_total_kn = length(M_kn);
-    it = [(1/length(uniqStates)):0.01:1];
-    kn_mat = zeros(length(it),length(thresh));
+    n_total_kn = length(M_kn); %length of known data
+    kn_mat = zeros(length(it),length(thresh)); %record accuracies for each threshold iteration
     for ii = 1:length(thresh)
         thresh_it = zeros(5,1);
         for tt = 1:length(it)
             thresh_it(ii) = it(tt);
-            %kn_mat(tt,ii) = (length(find(M_kn > thresh_it(I_kn))))./n_total_kn;
-            kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii));
+            kn_mat(tt,ii) = (length(find(I_kn == ii & M_kn > thresh_it(I_kn))))./length(find(I_kn == ii)); %threshold posteriors for the current iteration
         end
     end
 
     %Unknown Data
-    n_total_unk = length(M_unk);
-    it = [(1/length(uniqStates)):0.01:1];
-    unk_mat = zeros(length(it),length(thresh));
+    n_total_unk = length(M_unk); %length of unknown data
+    unk_mat = zeros(length(it),length(thresh)); %record accuracies for each threshold iteration
     for ii = 1:length(thresh)
         thresh_it = zeros(5,1);
         for tt = 1:length(it)
             thresh_it(ii) = it(tt);
-            %unk_mat(tt,ii) = (length(find(M_unk < thresh_it(I_unk))))./n_total_unk;
-            unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii));
+            unk_mat(tt,ii) = (length(find(I_unk == ii & M_unk < thresh_it(I_unk))))./length(find(I_unk == ii)); %threshold posteriors for the current iteration
         end
     end
     
@@ -358,8 +358,8 @@ for k = 1:folds
         plot(it, unk_mat(:,b),'LineWidth',3);
 
         %Plot maximum for both
-        total = kn_mat(:,b) + unk_mat(:,b);
-        [~,it_ind] = max(total);
+        total = kn_mat(:,b) + unk_mat(:,b); %sum both known and unknown accuracies
+        [~,it_ind] = max(total); %OPTIMIZE accuracy based on maximum of sum
         yL_2 = [0 1];
         line([it(it_ind) it(it_ind)],yL_2,'Color','r');
         it_max(b) = it(it_ind);
@@ -411,8 +411,8 @@ for k = 1:folds
     disp(['Unknown Accuracy = ' num2str(acc_unk)]);
 end
 
-%% Calculate Final Results
-%Calculate Averages
+%% Calculate and Plot Final Results
+%Calculate Average Accuracy Across Folds
 acc_kn = 0; acc_unk = 0;
 for i = 1:folds
     acc_kn = acc_kn + results(i).acc_kn.*(ind_change(i+1)-ind_change(i)); %weighted average
@@ -448,9 +448,9 @@ it_avg = zeros(length(uniqStates),1);
 for r = 1:folds
     it_avg = it_avg + results(r).it_max;
 end
-it_avg = it_avg./folds;
+it_avg = it_avg./folds; %average optimized thresholds across folds
 
-%Distributions
+%Posterior Distributions with Optimized Threshold Plotted
 post_mat = cell(2,length(uniqStates));
 for c = 1:folds
     for b = 1:length(uniqStates)
@@ -486,14 +486,15 @@ for m = 1:length(uniqStates)
     count = count + 1;
 end
 
+fprintf('\n')
 disp('OPTIMIZED THRESHOLDS:')
 it_avg
 
-%% Output Averaged Optimized Thresholds
+%% Export Averaged Optimized Thresholds
 if subject_analyze < 10
     subj_str = ['0' num2str(subject_analyze)];
 elseif subject_analyze > 9
     subj_str = num2str(subject_analyze);
 end
 filename = [home_data_folder 'CBR' subj_str '/' upper(brace_analyze) '_THRESH.mat'];
-save(filename,'it_avg')
+save(filename,'it_avg') %saves final thresholds for speicific person+brace

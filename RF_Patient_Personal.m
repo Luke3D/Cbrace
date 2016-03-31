@@ -4,6 +4,9 @@
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 
+patient_stairs = [2 8 11 12 15];
+disp(patient_stairs);
+
 p = gcp('nocreate');
 if isempty(p)
     parpool('local')
@@ -14,6 +17,10 @@ currentDir = pwd;
 slashdir = '/';
 addpath([pwd slashdir 'sub']); %create path to helper scripts
 addpath(genpath([slashdir 'Traindata'])); %add path for train data
+
+ARCode = currentDir(1:end-4);
+conf_folder = [ARCode 'confusion_matrices/Session/'];
+addpath(conf_folder);
 
 plotON = 1;                             %draw plots
 drawplot.activities = 1;                % show % of each activity
@@ -151,27 +158,41 @@ fprintf('\n')
 
 %% FILTER DATA FOR APPROPRIATE CLASSIFICATION RUNTYPE
 
-%Remove data from other locations if required (old datasets)
-cData = removeDataWithoutLocation(cData,'Belt');
-
 %Create local variables for often used data
 features     = cData.features; %features for classifier
 subjects     = cData.subject;  %subject number
 uniqSubjects = unique(subjects); %list of subjects
 statesTrue = cData.activity;     %all the classifier data
+subjectID = cData.subjectID;
+sessionID = cData.sessionID;
+
+%Remove stairs data from specific patients
+stairs_remove = [];
+for h = 1:length(patient_stairs)
+    a1 = find(subjectID == patient_stairs(h));
+    a2 = strmatch('Stairs Up',statesTrue,'exact');
+    a = intersect(a1,a2);
+    
+    b1 = find(subjectID == patient_stairs(h));
+    b2 = strmatch('Stairs Dw',statesTrue,'exact');
+    b = intersect(b1,b2);
+    
+    stairs_remove = [stairs_remove; a; b];
+end
+features(stairs_remove,:) = [];
+subjects(stairs_remove) = [];
+statesTrue(stairs_remove) = [];
+subjectID(stairs_remove) = [];
+sessionID(stairs_remove) = [];
 uniqStates  = unique(statesTrue);          %set of states we have
 
-%Remove any clips that don't meet the training set threshold
-%This is the %80 threshold in the paper
-[cData, removeInd] = removeDataWithActivityFraction(cData,clipThresh);
-
-%How many clips of each activity type we removed
-for i = 1:length(uniqStates)
-    indr = find(strcmp(trainingClassifierData.activity(removeInd),uniqStates(i)));
-    indtot = find(strcmp(trainingClassifierData.activity,uniqStates(i)));
-    removed = length(indr)/length(indtot)*100;
-    disp([num2str(removed) ' % of ' uniqStates{i} ' Train data removed (<' num2str(clipThresh) '% of clip)'])
-end
+% %How many clips of each activity type we removed
+% for i = 1:length(uniqStates)
+%     indr = find(strcmp(trainingClassifierData.activity(removeInd),uniqStates(i)));
+%     indtot = find(strcmp(trainingClassifierData.activity,uniqStates(i)));
+%     removed = length(indr)/length(indtot)*100;
+%     disp([num2str(removed) ' % of ' uniqStates{i} ' Train data removed (<' num2str(clipThresh) '% of clip)'])
+% end
 
 %% SORT THE DATA FOR K-FOLDS + RF TRAIN/TEST
 
@@ -190,7 +211,7 @@ StateCodes(:,1) = uniqStates;
 StateCodes(:,2) = num2cell(1:length(uniqStates)); %sorted by unique
 
 %SessionID index ranges (differentiate CBR session 1 from SCO session 1)
-N_session = length(cData.sessionID);
+N_session = length(sessionID);
 ind_change = [1]; %include first index;
 for kk = 1:(N_session-1)
     if ~((cData.sessionID(kk+1))-(cData.sessionID(kk)) == 0)
@@ -200,7 +221,7 @@ end
 ind_change = [ind_change N_session]; %include last index
 
 folds = length(ind_change) - 1; %number of folds = number of sessions
-activity_acc_matrix = zeros(5,folds);
+activity_acc_matrix = zeros(length(uniqStates),folds);
 
 %Do k fold cross validation for RF
 for k = 1:folds
@@ -212,17 +233,17 @@ for k = 1:folds
     %Remove clips that are a mix of activities from training set
     %These were the clips that did not meet the 80% threshold
     TrainingSet = ~testSet;
-    TrainingSet(removeInd) = 0;   %remove clips
+%     TrainingSet(removeInd) = 0;   %remove clips
     
     %% RF TRAINING AND TESTING
     
     %TRAIN RF
-    ntrees = 300;
+    ntrees = 100;
     
     %cost matrix 
-    CostM = 0.5*ones(5,5); CostM([1 7 13 19 25]) = 0; 
-    CostM(2,:) = 5; CostM(2,2) = 0;    %increase cost of misclassifying stairs
-    CostM(3,:) = 5; CostM(3,3) = 0;
+%     CostM = 0.5*ones(5,5); CostM([1 7 13 19 25]) = 0; 
+%     CostM(2,:) = 5; CostM(2,2) = 0;    %increase cost of misclassifying stairs
+%     CostM(3,:) = 5; CostM(3,3) = 0;
     
     tic; %start timer
     
@@ -239,7 +260,7 @@ for k = 1:folds
     end
 
     opts_ag = statset('UseParallel',1);
-    RFmodel = TreeBagger(ntrees,features(TrainingSet,:),codesTrue(TrainingSet)','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
+    RFmodel = TreeBagger(ntrees,features(TrainingSet,:),codesTrue(TrainingSet)','OOBVarImp',OOBVarImp,'Options',opts_ag);
        
     %Plot var importance
     if strcmp(OOBVarImp,'on')
@@ -283,7 +304,7 @@ for k = 1:folds
     %% PLOT PREDICTED AND ACTUAL STATES
     
     %Rename states for plot efficiency
-    StateCodes(:,1) = {'Sit','Stairs Dw','Stairs Up','Stand','Walk'};
+    %StateCodes(:,1) = {'Sit','Stairs Dw','Stairs Up','Stand','Walk'};
     nstates = length(StateCodes);
 
     if plotON
@@ -349,9 +370,9 @@ fprintf('\n')
 disp(['Unweighted Mean (k-fold) accRF = ' num2str(accRF_uw)]);
 disp(['Weighted Mean (k-fold) accRF = ' num2str(accRF)]);
 
-matRF = matRF./folds;
+matRF_avg = matRF./folds;
 figure('name','Mean (k-fold) Confusion matrix')
-imagesc(matRF); 
+imagesc(matRF_avg); 
 colorbar
 [cmin,cmax] = caxis;
 caxis([0,1])
@@ -386,7 +407,7 @@ disp(acc_tbl)
 %% Activity Accuracy Table
 temp2 = mean(activity_acc_matrix');
 activity_acc = [activity_acc_matrix temp2'];
-act = {'Sitting';'Stairs Dw';'Stairs Up';'Standing';'Walking'};
+act = StateCodes(:,1);
 var_name = cell(folds+1,1);
 for ii = 1:folds
     var_name(ii) = {['Fold_' num2str(ii)]};
@@ -395,3 +416,41 @@ var_name(end) = {'Mean'};
 
 activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
 disp(activity_tbl)
+
+%% Output Edited Confusion Matrix
+%Instances matrix
+instances = zeros(length(uniqStates));
+correct = zeros(length(uniqStates));
+for i = 1:folds
+    instances = instances + (results(i).matRF);
+    correct_temp = sum(results(i).matRF,2);
+    correct_temp2 = repmat(correct_temp,[1 size(StateCodes,1)]);
+    correct = correct + correct_temp2;
+end
+
+%No stairs (convert 3x3 matrix to 5x5 matrix)
+if length(uniqStates) == 3
+    i_3 = instances;
+    c_3 = correct;
+    
+    instances = zeros(5);
+    correct = zeros(5,1);
+    
+    indx = [1 4 5 16 19 20 21 24 25]; %transformed indices
+    for i = 1:9
+        instances(indx(i)) = i_3(i);
+    end
+    
+    correct(1) = c_3(1);
+    correct(4:5) = c_3(2:3);
+    correct = repmat(correct,[1 5]);
+end
+
+if subject_analyze < 10
+    subj_str = ['0' num2str(subject_analyze)];
+elseif subject_analyze > 9
+    subj_str = num2str(subject_analyze);
+end
+
+filename = [conf_folder 'CBR' subj_str];
+save(filename,'instances','correct','matRF_avg')

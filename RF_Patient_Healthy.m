@@ -4,6 +4,9 @@
 %% LOAD DATA AND INITIALIZE PARAMETERS
 clear all, close all;
 
+patient_stairs = [2 8 11 12 15];
+disp(patient_stairs);
+
 p = gcp('nocreate');
 if isempty(p)
     parpool('local')
@@ -16,10 +19,10 @@ addpath([pwd slashdir 'sub']); %create path to helper scripts
 addpath(genpath([slashdir 'Traindata'])); %add path for train data
 
 plotON = 1;                             %draw plots
-drawplot.activities = 1;                % show % of each activity
+drawplot.activities = 0;                % show % of each activity
 drawplot.accuracy = 0;
 drawplot.actvstime = 0;
-drawplot.confmat = 1;
+drawplot.confmat = 0;
 
 %Additional options
 clipThresh = 0; %to be in training set, clips must have >X% of label
@@ -46,7 +49,7 @@ CostM(3,:) = 5; CostM(3,3) = 0;
 %Train RF
 n_h = length(unique(trainingClassifierData.subjectID));
 disp(['Training classifier on ' num2str(n_h) ' healthy subjects...'])
-ntrees = 300;
+ntrees = 50;
 opts_ag = statset('UseParallel',1);
 RFmodel = TreeBagger(ntrees,features_h,codesTrue_h','OOBVarImp',OOBVarImp,'Cost',CostM,'Options',opts_ag);
 disp('Classifier trained.')
@@ -195,7 +198,28 @@ features     = cData.features; %features for classifier
 subjects     = cData.subject;  %subject number
 uniqSubjects = unique(subjects); %list of subjects
 statesTrue = cData.activity;     %all the classifier data
+subjectID = cData.subjectID;
+sessionID = cData.sessionID;
 uniqStates  = unique(statesTrue);          %set of states we have
+
+%Remove stairs data from specific patients
+stairs_remove = [];
+for h = 1:length(patient_stairs)
+    a1 = find(subjectID == patient_stairs(h));
+    a2 = strmatch('Stairs Up',statesTrue,'exact');
+    a = intersect(a1,a2);
+    
+    b1 = find(subjectID == patient_stairs(h));
+    b2 = strmatch('Stairs Dw',statesTrue,'exact');
+    b = intersect(b1,b2);
+    
+    stairs_remove = [stairs_remove; a; b];
+end
+features(stairs_remove,:) = [];
+subjects(stairs_remove) = [];
+statesTrue(stairs_remove) = [];
+subjectID(stairs_remove) = [];
+sessionID(stairs_remove) = [];
 
 %Remove any clips that don't meet the training set threshold
 %This is the %80 threshold in the paper
@@ -226,7 +250,7 @@ StateCodes(:,1) = uniqStates;
 StateCodes(:,2) = num2cell(1:length(uniqStates)); %sorted by unique
 
 %SubjectID index ranges
-N_session = length(cData.subjectID);
+N_session = length(subjectID);
 ind_change = [1]; %include first index;
 for kk = 1:(N_session-1)
     if ~((cData.subjectID(kk+1))-(cData.subjectID(kk)) == 0)
@@ -273,7 +297,15 @@ for k = 1:folds
     
     %% RESULTS for each k-fold
     %entire classification matrix (HMM prediction is run only on Test data)
-    [matRF,accRF,labels] = createConfusionMatrix(codesTrue(testSet),codesRF(testSet));
+    matRF = zeros(5,5);
+    v1 = codesTrue(testSet);
+    v2 = codesRF(testSet);
+    for t = 1:length(codesTrue(testSet))
+        matRF(v1(t),v2(t)) = matRF(v1(t),v2(t)) + 1;
+    end
+    accRF = trace(matRF)/sum(sum(matRF));
+    disp(matRF)
+    disp(accRF)
     
     %Store all results
     results(k).stateCodes        = StateCodes;
@@ -374,7 +406,6 @@ set(gca,'XTickLabel',{})
 set(gca,'YTickLabel',StateCodes(:,1))
 axis square
 
-toc
 
 %% Accuracy Table
 test_size = zeros(folds+2,1);
@@ -407,3 +438,15 @@ var_name(end) = {'Mean'};
 
 activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
 disp(activity_tbl)
+
+%% Output Edited Confusion Matrix
+%Instances matrix
+instances = zeros(length(uniqStates));
+correct = zeros(length(uniqStates));
+for i = 1:folds
+    instances = instances + (results(i).matRF);
+    correct_temp = sum(results(i).matRF,2);
+    correct_temp2 = repmat(correct_temp,[1 size(StateCodes,1)]);
+    correct = correct + correct_temp2;
+end
+mat_avg = instances./correct;
