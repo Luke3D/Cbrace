@@ -17,7 +17,7 @@ addpath(DSA_raw_folder)
 addpath(code_folder)
 
 %% Import Raw Data
-act_ID = [1:9]; %activities in DSA set to analyze
+act_ID = [1:19]; %activities in DSA set to analyze
 
 %Import Each Activity Folder
 for ii = 1:length(act_ID) %go through each activity

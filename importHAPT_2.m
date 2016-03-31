@@ -130,7 +130,7 @@ for ii = 1:length(subjects) %go through each subject
                 Nclips = floor(size(acc_act_2,1)/dur);
                 X_feat = zeros(Nclips,Nfeat);    %matrix with features for all clips
                 parfor c = 1:Nclips
-                    X_feat(c,:) = getFeaturesHOME((9.81.*(acc_act_2((c-1)*dur+1:c*dur,:)))'); %generate features
+                    X_feat(c,:) = getFeaturesHOME(((acc_act_2((c-1)*dur+1:c*dur,:)))'); %generate features
                 end
                 
                 X_all = [X_all; X_feat];

@@ -32,7 +32,8 @@ classifierData = removeDataWithNaNs(classifierData);
 
 %ACTIVITIES TO REMOVE
 classifierData = removeDataWithLocation(classifierData,'Not Wearing');
-classifierData = removeDataWithActivity(classifierData,'Not Wearing'); 
+classifierData = removeDataWithActivity(classifierData,'Not Wearing');
+classifierData = removeDataWithActivity(classifierData,'Not labeled'); 
 classifierData = removeDataWithActivity(classifierData,'Misc');
 classifierData = removeDataWithLocation(classifierData,'Not Wearing');
 classifierData = removeDataWithActivity(classifierData,'Sit to Stand');
