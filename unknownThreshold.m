@@ -195,16 +195,58 @@ for i = 1:length(uniqStates)
     disp([num2str(removed) ' % of ' uniqStates{i} ' Train data removed (<' num2str(clipThresh) '% of clip)'])
 end
 
-%% SORT THE DATA FOR K-FOLDS + RF TRAIN/TEST
-
-%Indices for test set + set all to 0, we will specify test set soon
-testSet = false(length(statesTrue),1);
-
 %Get codes for the true states (i.e. make a number code for each state) and save code and state
 codesTrue = zeros(1,length(statesTrue));
 for i = 1:length(statesTrue)
     codesTrue(i) = find(strcmp(statesTrue{i},uniqStates));
 end
+
+%% CHECK FOR STAIRS IN EACH SESSION + REMOVE SESSOINS WITHOUT STAIRS
+
+no_stairs_up = 0;
+no_stairs_dw = 0;
+sessions = unique(cData.sessionID);
+sessions_removed = zeros(length(sessions),1);
+
+for b = 1:length(sessions) %go through each session
+    no_stairs_dw = isempty(find(cData.sessionID == sessions(b) & codesTrue' == 2, 1));
+    no_stairs_up = isempty(find(cData.sessionID == sessions(b) & codesTrue' == 3, 1));
+    
+    if no_stairs_dw || no_stairs_up %remove session if no stairs data present in the session
+        session_ind = find(cData.sessionID == sessions(b));
+        features(session_ind,:) = [];
+        subjects(session_ind) = [];
+        statesTrue(session_ind) = [];
+        codesTrue(session_ind) = [];
+        cData.subjectID(session_ind) = [];
+        cData.sessionID(session_ind) = [];
+        cData.activity(session_ind) = [];
+        cData.wearing(session_ind) = [];
+        cData.identifier(session_ind) = [];
+        cData.subject(session_ind) = [];
+        cData.features(session_ind,:) = [];
+        cData.activityFrac(session_ind) = [];
+        cData.states(session_ind) = [];
+        cData.subjectBrace(session_ind) = [];
+        
+        sessions_removed(b) = 1;
+    end
+end
+
+fprintf('\n')
+if any(sessions_removed == 1)
+    disp('Not all sessions have stairs...')
+    disp(['Session IDs Removed: '])
+    disp(sessions(logical(sessions_removed)))
+else
+    disp('All sessions have stairs...')
+    disp(['Session IDs Removed: NONE'])
+end
+
+%% SORT THE DATA FOR K-FOLDS + RF TRAIN/TEST
+
+%Indices for test set + set all to 0, we will specify test set soon
+testSet = false(length(statesTrue),1);
 
 %Store Code and label of each unique State
 StateCodes = cell(length(uniqStates),2);

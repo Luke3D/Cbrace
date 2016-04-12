@@ -5,6 +5,8 @@ clear all; close all;
 warning('off','all')
 slashdir = '/';
 
+subject_stairs = [2 8]; %CBR SUBJECTS TO REMOVE STAIRS FOR
+
 cd(fileparts(which('HomeData.m')))
 currentDir = pwd;
 addpath([pwd slashdir 'sub']); %create path to helper scripts
@@ -24,7 +26,6 @@ drawplot.activities = 0;
 drawplot.actvstime = 1;
 drawplot.confmat = 1;
 UseHMM = 1;  
-subject_stairs = [2 8]; %List of subject IDs for stairs to remove
 
 %% ASK TO USE LAB/HOME/BOTH LABELED DATA FOR TRAINING
 use_home = 0; use_lab = 0;
@@ -978,14 +979,19 @@ disp(['RF Prediction took ' num2str(t) ' seconds.'])
 codesRF = str2num(cell2mat(codesRF));
 
 %% THRESHOLD RANDOM FOREST POSTERIORS FOR UNKNOWN DATA
-load([home_data_folder 'CBR' subj_str '/' upper(brace_analyze) '_THRESH.mat']);
-unk_thresh = it_avg;
-unk_ind = cell(5,1); %indices of unknown data
-[M, I] = max(P_RF,[],2); %get max and index for posterior matrix
-
-for ii = 1:length(unk_thresh)
-    unk_ind{ii} = find(I == ii & M < unk_thresh(I)); %find and store indices of unknown data points
-end
+% load([home_data_folder 'CBR' subj_str '/' upper(brace_analyze) '_THRESH.mat']);
+% unk_thresh = it_avg;
+% unk_ind = cell(5,1); %indices of unknown data
+% [M, I] = max(P_RF,[],2); %get max and index for posterior matrix
+% 
+% unk_ind_all = [];
+% for ii = 1:length(unk_thresh)
+%     unk_ind{ii} = find(I == ii & M < unk_thresh(I)); %find and store indices of unknown data points
+%     unk_ind_all = [unk_ind_all; unk_ind{ii}];
+% end
+% 
+% P_RF(unk_ind_all,:) = [];
+% time_clips(unk_ind_all,:) = [];
 
 %% RUN HMM ON RANDOM FOREST OUTPUT
 if UseHMM
