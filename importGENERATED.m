@@ -1,3 +1,7 @@
+%%
+%INPUTS: Generated "fake" activities (Luca + Arun) csv files
+%OUTPUT: One .mat file containing features matrix for all input csv files
+% TO FINISH!!
 %% Load Directories
 clear all, close all;
 

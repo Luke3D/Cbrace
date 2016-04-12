@@ -1,11 +1,13 @@
 %% Thresholding for Unknown Data
 % Aakash Gupta (November 21, 2015)
+%INPUTS: Load features of unknown activities
+%OUTPUTS: Optimized thresholds
 
 %% LOAD DIRECTORIES AND INITIALIZE PARAMETERS
 clear all, close all;
 
-DSA_activity = [1:19]; %DSA activities to analyze
-HAPT_subjects = [1:30]; %HAPT subjects to analyze
+DSA_activity = [10:19]; %DSA activities to analyze
+HAPT_subjects = []; %HAPT subjects to analyze
 disp(['Analyzing ' num2str(length(DSA_activity)) ' DSA activities.'])
 disp(['Analyzing ' num2str(length(HAPT_subjects)) ' HAPT subjects.'])
 fprintf('\n')
