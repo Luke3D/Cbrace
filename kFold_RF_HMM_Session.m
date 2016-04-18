@@ -23,9 +23,9 @@ addpath(genpath([slashdir 'Traindata'])); %add path for train data
 plotON = 1;                             %draw plots
 drawplot.activities = 0;                % show % of each activity
 drawplot.accuracy = 0;
-drawplot.actvstime = 0;
+drawplot.actvstime = 1;
 drawplot.confmat = 1;
-drawplot.posterior = 1;
+drawplot.posterior = 0;
 drawplot.posteriorhist = 1;
 
 %Additional options
@@ -542,3 +542,17 @@ var_name(end) = {'Mean'};
 
 activity_tbl = array2table(activity_acc,'RowNames',act,'VariableNames',var_name);
 disp(activity_tbl)
+
+%% compute precision and recall on each class and add Table
+matRF = zeros(size(matRF)); %initialize Confusion Matrix
+for i = 1:length(results)
+    matRF = matRF+results(i).matRF;
+end
+Prec_Recall = [];
+for c = 1:length(StateCodes)
+    Prec_Recall(c,1) = matRF(c,c)/sum(matRF(:,c)); %Precision
+    Prec_Recall(c,2) = matRF(c,c)/sum(matRF(c,:)); %Recall
+end
+PrecRecall_tbl = array2table(Prec_Recall,'RowNames',act,'VariableNames',{'Precision','Recall'});
+fprintf('\n')
+disp(PrecRecall_tbl)
