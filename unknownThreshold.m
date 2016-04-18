@@ -541,4 +541,4 @@ elseif subject_analyze > 9
     subj_str = num2str(subject_analyze);
 end
 filename = [home_data_folder 'CBR' subj_str '/' upper(brace_analyze) '_THRESH.mat'];
-save(filename,'it_avg') %saves final thresholds for speicific person+brace
+save(filename,'it_avg','acc_kn','acc_unk') %saves final thresholds for speicific person+brace
