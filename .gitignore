@@ -4,7 +4,5 @@ Testdata/
 Traindata/
 *.asv
 .DS_Store
-
-*.m~
-
+Export/
 *.m~
