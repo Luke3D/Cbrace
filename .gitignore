@@ -1,8 +1,8 @@
-Figs/
-Homedata/
-Testdata/
-Traindata/
+Figs/*
+Homedata/*
+Testdata/*
+Traindata/*
 *.asv
 .DS_Store
-Export/
+Export/*
 *.m~
